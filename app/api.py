@@ -63,7 +63,7 @@ async def chat(websocket: WebSocket):
     try:
         while True:
             try:
-                query = await asyncio.wait_for(ws_connection.receive_message(websocket), timeout=60)
+                query = await asyncio.wait_for(ws_connection.receive_message(websocket), timeout=600)
                 logger.info(f"Received message: {query}")
                 response = await assistant.run(query)
                 logger.info(f"AI response: {response}")

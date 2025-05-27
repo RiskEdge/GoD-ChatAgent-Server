@@ -45,7 +45,8 @@ class WebSocketCallbackHandler(AsyncCallbackHandler):
         **kwargs: Any,
     ) -> None:
         # Optional: Send a message to the client indicating the start of processing
-        await self.manager.send_message("Chat model processing started.", self.websocket)
+        # await self.manager.send_message("Chat model processing started.", self.websocket)
+        return None
     
     async def on_llm_start(
         self,
@@ -59,7 +60,8 @@ class WebSocketCallbackHandler(AsyncCallbackHandler):
         **kwargs: Any,
     ) -> None:
         # Optional: Send a message to the client indicating the start of processing
-        await self.manager.send_message("Chat model processing started.", self.websocket)
+        # await self.manager.send_message("Chat model processing started.", self.websocket)
+        return None
         
     async def on_llm_new_token(self, token: str, **kwargs):
         """Send each new token to the client"""
