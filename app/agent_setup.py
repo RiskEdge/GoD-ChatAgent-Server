@@ -3,7 +3,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
 
-from logs.logger import setup_logger
+from .logs.logger import setup_logger
 import os
 
 logger = setup_logger("GoD AI Chatbot: Agent Setup", "app.log")
@@ -58,7 +58,7 @@ class ChatAssistantChain:
         self.callback_handler = callback_handler
         self.llm = ChatOpenAI(
             model="o3-mini", 
-            max_tokens=1000, 
+            max_tokens=2000, 
             streaming=True,
             callbacks=[self.callback_handler] ,
         )
@@ -74,7 +74,7 @@ class ChatAssistantChain:
     def get_memory_messages(self, query):
         try:
             history = self.memory.load_memory_variables(query).get("history", [])
-            logger.debug(f"Loaded memory history.")
+            logger.debug(f"Loaded memory history:\n {history}\n\n")
             return history
         except Exception as e:
             logger.error(f"Error loading memory history: {e}")
@@ -101,7 +101,7 @@ class ChatAssistantChain:
         try:
             chain = self.get_chain()
             logger.info(f"Processing user input: {user_input}")
-            response = chain.invoke({"input": user_input})
+            response = await chain.ainvoke({"input": user_input})
             logger.info(f"AI response: {response.content}")
             
             self.memory.save_context({"input": user_input}, {"output": response.content})

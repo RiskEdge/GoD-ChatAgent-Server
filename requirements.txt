@@ -4,3 +4,4 @@ langchain==0.3.25
 langchain-tools==0.1.34
 langchain-community==0.3.24
 langchain-openai==0.3.17
+pymongo==4.13.0

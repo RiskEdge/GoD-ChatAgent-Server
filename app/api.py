@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -10,9 +10,15 @@ import dotenv
 
 dotenv.load_dotenv()
 
+from .logs.logger import setup_logger
+from .db.conn import db_client
+from .db.queries import get_geek_by_id, get_all_geeks, get_geeks
+from .models.geek_model import GeekBase
 from .ws_connection import ConnectionManager, WebSocketCallbackHandler
-from logs.logger import setup_logger
 from .agent_setup import ChatAssistantChain
+
+from .routes.db_routes import router as db_router
+
 
 app = FastAPI()
 logger = setup_logger("GoD AI Chatbot: Server", "app.log")
@@ -47,6 +53,17 @@ async def log_requests(request: Request, call_next):
     
     return response
 
+@app.on_event("startup")
+def startup_db_client():
+    app.mongodb_client = db_client()
+    app.state.database = app.mongodb_client[os.environ["DB_NAME"]]
+    print("Connnected to MongoDB database.")
+    
+@app.on_event("shutdown")
+def shutdown_db_client():
+    app.mongodb_client.close()
+    print("Disconnected from MongoDB database.")
+
 @app.get("/")
 async def index():
     logger.info("Root route hit")
@@ -66,7 +83,7 @@ async def chat(websocket: WebSocket):
                 query = await asyncio.wait_for(ws_connection.receive_message(websocket), timeout=600)
                 logger.info(f"Received message: {query}")
                 response = await assistant.run(query)
-                logger.info(f"AI response: {response}")
+                # logger.info(f"AI response: {response}")
             except asyncio.TimeoutError:
                 await ws_connection.send_message(websocket, "Session timed out due to inactivity.")
                 await ws_connection.disconnect(websocket)
@@ -79,3 +96,5 @@ async def chat(websocket: WebSocket):
         logger.error(f"Error during chat: {e}")
         await websocket.close()
                 
+             
+app.include_router(db_router)
