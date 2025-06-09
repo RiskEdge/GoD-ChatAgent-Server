@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 import asyncio
 import os
 import time
+import json
 import dotenv
 
 dotenv.load_dotenv()
@@ -24,7 +25,7 @@ app = FastAPI()
 logger = setup_logger("GoD AI Chatbot: Server", "app.log")
 
 origins = [
-    "http://localhost:3000",
+    "http://localhost:5173",
 ]
 
 app.add_middleware(
@@ -80,10 +81,11 @@ async def chat(websocket: WebSocket):
     try:
         while True:
             try:
-                query = await asyncio.wait_for(ws_connection.receive_message(websocket), timeout=600)
+                query = await ws_connection.receive_message(websocket)
                 logger.info(f"Received message: {query}")
                 response = await assistant.run(query)
-                # logger.info(f"AI response: {response}")
+                await ws_connection.send_message(json.dumps(response), websocket)
+                logger.info(f"AI response: {response}")
             except asyncio.TimeoutError:
                 await ws_connection.send_message(websocket, "Session timed out due to inactivity.")
                 await ws_connection.disconnect(websocket)

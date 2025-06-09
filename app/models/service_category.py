@@ -3,7 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 from bson import ObjectId
 
-from helper import PyObjectId
+from .helper import PyObjectId
 
 class CategoryBase(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id")

@@ -3,7 +3,7 @@ from pymongo.database import Database
 
 from ..logs.logger import setup_logger
 from ..dependencies import get_database
-from ..db.queries import get_all_geeks, get_geek_by_id
+from ..db.queries import get_all_geeks, get_geek_by_id, get_all_services
 
 router = APIRouter(
     prefix="/db_query",
@@ -38,4 +38,17 @@ async def get_geek_from_id(id: str, db: Database = Depends(get_database)):
         return {"geek": geek}
     except Exception as e:  
         logger.error(f"Error getting geeks: {e}")
+        return {"error": str(e)}
+    
+@router.get("/get_service_categories")
+async def get_service_categories(db: Database = Depends(get_database)):
+    try:
+        logger.info("Fetching available service categories")
+        categories = get_all_services(db)
+        if not categories:  
+            logger.error("Service categories not found")
+            raise HTTPException(status_code=404, detail="Service categories not found")
+        return {"categories": categories}
+    except Exception as e:
+        logger.error(f"Error getting service categories: {e}")
         return {"error": str(e)}

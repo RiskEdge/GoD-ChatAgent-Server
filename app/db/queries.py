@@ -6,7 +6,8 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from ..dependencies import get_database
-from ..models.geek_model import GeekBase, IndividualGeek, CorporateGeek  # Adjust the import path as needed
+from ..models.geek_model import GeekBase, IndividualGeek, CorporateGeek  
+from ..models.service_category import CategoryBase
 
 def get_geeks(
     db,
@@ -102,4 +103,11 @@ def get_all_geeks(db: Database) -> List[GeekBase]:
         else:
             geek = GeekBase(**doc)
         results.append(geek)
+    return results
+
+def get_all_services(db: Database) -> List[CategoryBase]:
+    cursor = db.categories.find()
+    results = []
+    for doc in cursor:
+        results.append(CategoryBase(**doc))
     return results
