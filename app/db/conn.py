@@ -9,7 +9,9 @@ def db_client():
     Returns:
         MongoClient: A client instance connected to the specified MongoDB database.
     """
-
-    MONGODB_URI = os.environ["MONGODB_URI"]
-    client = MongoClient(MONGODB_URI)
-    return client
+    try:
+        MONGODB_URI = os.environ["MONGODB_URI"]
+        client = MongoClient(MONGODB_URI)
+        return client
+    except Exception as e:
+        return f"Error connecting to MongoDB: {e}"

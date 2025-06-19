@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field, EmailStr, validator, root_validator
+from pydantic import BaseModel, Field, EmailStr, root_validator
 from typing import Optional
 from enum import Enum
 from datetime import datetime
+from .helper import PyObjectId
+from bson import ObjectId
 
 
 class AuthProviderEnum(str, Enum):
@@ -39,7 +41,7 @@ class Location(BaseModel):
 
 
 class SeekerBase(BaseModel):
-    id: Optional[str] = Field(alias="_id")  # MongoDB _id, optional in input
+    id: Optional[PyObjectId] = Field(alias="_id")  # MongoDB _id, optional in input
 
     authProvider: AuthProviderEnum
     authProviderId: str
@@ -83,3 +85,4 @@ class SeekerBase(BaseModel):
     class Config:
         allow_population_by_field_name = True
         orm_mode = True
+        json_encoders = {ObjectId: str}

@@ -6,7 +6,7 @@ from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
 from pydantic import BaseModel
 from typing import Optional, List
 
-from .logs.logger import setup_logger
+from ..logs.logger import setup_logger
 
 class AgentResponse(BaseModel):
     response: str
@@ -20,21 +20,21 @@ SYS_PROMPT="""You are a technical support agent whose role is to gather comprehe
 Always keep you messages crisp and short.
 
 Information to Collect:
-Device Details:
-    Brand and exact model
-    Device type and specifications
-    Operating system/software version
+    Device Details:
+        Brand and exact model
+        Device type and specifications
+        Operating system/software version
 
-Purchase Information:
-    Purchase date
-    Warranty status and duration
-    Purchase location if relevant
+    Purchase Information:
+        Purchase date
+        Warranty status and duration
+        Purchase location if relevant
 
-Problem Description:
-    Specific symptoms and error messages
-    When the issue occurs (patterns, frequency)
-    What triggers the problem
-    Previous troubleshooting attempts
+    Problem Description:
+        Specific symptoms and error messages
+        When the issue occurs (patterns, frequency)
+        What triggers the problem
+        Previous troubleshooting attempts
 
 Communication Guidelines:
     Ask clear, focused questions only one at a time
@@ -46,11 +46,11 @@ Communication Guidelines:
     
 
 Process:
-    Greet the user and ask for their issue description
+    Greet the user and ask for their issue description with options(if applicable)
     Systematically gather device and problem details
-    Ask follow-up questions to clarify specifics
+    Ask follow-up questions(with proper options if applicable) to clarify specifics
     Provide a structured summary of all collected information
-    Confirm accuracy of the summary with the user
+    Confirm accuracy of the summary with the user. Your question for this MUST be exactly: "I have gathered all the necessary information. Is this summary correct?"
 
 If users ask for help beyond information gathering:
 Politely redirect: "I am here to gather information about your device issue. Could you tell me more about [relevant detail]?"
@@ -67,7 +67,7 @@ Options Field: Contains 3-5 relevant answer choices when appropriate
 Have a look at the examples below to see what kind of options are appropriate based on the issue/device:
 For device brand: {{ {{"response"}}: "What brand is your device?", {{"options"}}: ["Apple", "Samsung", "Dell", "HP", "Other"]}}
 For problem frequency:{{ {{"response"}}: "How often does this issue occur?", {{"options"}}: ["Every time", "Several times a day", "Once a day", "Occasionally", "Other"] }}
-For confirmation: {{ {{"response"}}: "Is this information correct?", {{"options"}}: ["Yes", "No - needs correction"]}}
+For confirmation: {{ {{"response"}}: "I have gathered all the necessary information. Is this summary correct?", {{"options"}}: ["Yes", "No - needs correction"]}}
 
 You will be provided with conversation history to understand what information has already been collected.
 """
@@ -77,10 +77,10 @@ class ChatAssistantChain:
         self.memory = ConversationBufferMemory(return_messages=True)
         self.callback_handler = callback_handler
         self.llm = ChatOpenAI(
-            model="o3-mini", 
-            max_tokens=2000, 
-            streaming=True,
-            callbacks=[self.callback_handler] ,
+            model="o4-mini", 
+            # max_tokens=2000, 
+            # streaming=True,
+            # callbacks=[self.callback_handler] ,
         )
         self.prompt = ChatPromptTemplate.from_messages(
                 [

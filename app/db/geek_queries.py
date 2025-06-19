@@ -1,13 +1,12 @@
-from pymongo import MongoClient
 from pymongo.database import Database
-from fastapi import Depends
 from bson import ObjectId
 from typing import Optional, List, Dict, Any
-from datetime import datetime
 
-from ..dependencies import get_database
 from ..models.geek_model import GeekBase, IndividualGeek, CorporateGeek  
 from ..models.service_category import CategoryBase
+from ..logs.logger import setup_logger
+
+logger = setup_logger("GoD AI Chatbot: Geek Query", "app.log")
 
 def get_geeks(
     db,
@@ -80,34 +79,52 @@ def get_geeks(
 
 
 def get_geek_by_id(geek_id: str, db: Database) -> Optional[GeekBase]:
-    geek = db.geeks.find_one({"_id": ObjectId(geek_id)})
-    if geek:
-        geek_type = geek.get("type")
-        if geek_type == "Individual":
-            return IndividualGeek(**geek)
-        elif geek_type == "Corporate":
-            return CorporateGeek(**geek)
-        else:
-            return GeekBase(**geek)
-    return None
+    try:
+        logger.info("Fetching geek by id: ", geek_id)
+        geek = db.geeks.find_one({"_id": ObjectId(geek_id)})
+        if geek:
+            geek_type = geek.get("type")
+            if geek_type == "Individual":
+                logger.info(f"Found individual geek with id: {geek_id}")
+                return IndividualGeek(**geek)
+            elif geek_type == "Corporate":
+                logger.info(f"Found corporate geek with id: {geek_id}")
+                return CorporateGeek(**geek)
+            else:
+                return GeekBase(**geek)
+        logger.error(f"Geek with id {geek_id} not found")
+        return None
+    except Exception as e:
+        logger.error(f"Error fetching geek by id {geek_id}: {e}")
+        return None
 
 def get_all_geeks(db: Database) -> List[GeekBase]:
-    cursor = db.geeks.find()
-    results = []
-    for doc in cursor:
-        geek_type = doc.get("type")
-        if geek_type == "Individual":
-            geek = IndividualGeek(**doc)
-        elif geek_type == "Corporate":
-            geek = CorporateGeek(**doc)
-        else:
-            geek = GeekBase(**doc)
-        results.append(geek)
-    return results
+    try:
+        logger.info("Fetching all geeks")
+        cursor = db.geeks.find()
+        results = []
+        for doc in cursor:
+            geek_type = doc.get("type")
+            if geek_type == "Individual":
+                geek = IndividualGeek(**doc)
+            elif geek_type == "Corporate":
+                geek = CorporateGeek(**doc)
+            else:
+                geek = GeekBase(**doc)
+            results.append(geek)
+        return results
+    except Exception as e:
+        logger.error(f"Error fetching all geeks: {e}")
+        return []
 
 def get_all_services(db: Database) -> List[CategoryBase]:
-    cursor = db.categories.find()
-    results = []
-    for doc in cursor:
-        results.append(CategoryBase(**doc))
-    return results
+    try:
+        logger.info("Fetching all service categories")
+        cursor = db.categories.find()
+        results = []
+        for doc in cursor:
+            results.append(CategoryBase(**doc))
+        return results
+    except Exception as e:
+        logger.error(f"Error fetching all service categories: {e}")
+        return []

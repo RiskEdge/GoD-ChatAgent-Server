@@ -3,15 +3,15 @@ from pymongo.database import Database
 
 from ..logs.logger import setup_logger
 from ..dependencies import get_database
-from ..db.queries import get_all_geeks, get_geek_by_id, get_all_services
+from ..db.geek_queries import get_all_geeks, get_geek_by_id, get_all_services
 
 router = APIRouter(
-    prefix="/db_query",
-    tags=["db"],
+    prefix="/geek_query",
+    tags=["db", "geek"],
     responses={404: {"description": "Not found"}},
 )
 
-logger = setup_logger("GoD AI Chatbot: DB Query", "app.log")
+logger = setup_logger("GoD AI Chatbot: Geek Route", "app.log")
 
 @router.get("/get_all_geeks")
 async def get_geeks_all(db: Database = Depends(get_database)):

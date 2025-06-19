@@ -8,18 +8,24 @@ import os
 import time
 import json
 import dotenv
+import uuid
 
 dotenv.load_dotenv()
 
 from .logs.logger import setup_logger
 from .db.conn import db_client
-from .db.queries import get_geek_by_id, get_all_geeks, get_geeks
-from .models.geek_model import GeekBase
-from .ws_connection import ConnectionManager, WebSocketCallbackHandler
-from .agent_setup import ChatAssistantChain
+from .db.agent_chat_queries import create_chat_message, get_chat_history_with_agent
+from .db.user_issue_queries import create_user_issue
+from .utils.ws_connection import ConnectionManager, WebSocketCallbackHandler
+from .utils.agent_setup import ChatAssistantChain
+from .utils.issue_extractor import IssueExtractor
 
-from .routes.db_routes import router as db_router
+from .models.user_issue_model import UserIssueCreate
+from .models.agent_chat_model import ChatMessageCreate, MessageSender
 
+from .routes.geek_routes import router as db_router
+from .routes.seeker_routes import seeker_router
+from .routes.chat_route import chat_router
 
 app = FastAPI()
 logger = setup_logger("GoD AI Chatbot: Server", "app.log")
@@ -37,6 +43,8 @@ app.add_middleware(
 )
 
 ws_connection = ConnectionManager()
+
+agent_last_question = {}
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
@@ -70,29 +78,93 @@ async def index():
     logger.info("Root route hit")
     return JSONResponse(status_code=200, content={"message": "Hello World!"})
 
-@app.websocket("/chat")
-async def chat(websocket: WebSocket):
+@app.websocket("/chat/{user_id}")
+async def chat(websocket: WebSocket, user_id: str):
     logger.info("Chat with agent initiated.")
     await ws_connection.connect(websocket)
     
-    callback_handler = WebSocketCallbackHandler(websocket, ws_connection)
-    assistant = ChatAssistantChain(callback_handler=callback_handler)
+    extractor = IssueExtractor()
+    conversation_id = str(uuid.uuid4())
+    
+    # callback_handler = WebSocketCallbackHandler(websocket, ws_connection)
+    # assistant = ChatAssistantChain(callback_handler=callback_handler)
+    assistant = ChatAssistantChain()
     
     try:
         while True:
             try:
                 query = await ws_connection.receive_message(websocket)
                 logger.info(f"Received message: {query}")
+                
+                # Creating user message from the pydantic model
+                user_message = ChatMessageCreate(
+                    conversation_id=conversation_id,
+                    user_id=user_id,
+                    sender=MessageSender.USER,
+                    message=query
+                )
+                await create_chat_message(user_message, app.state.database)
+                logger.info("User message saved to DB.")
+                
+                # CHECK FOR COMPLETION TRIGGER
+                # If the agent;s last message was the confirmation prompt and user says 'yes'
+                last_question = agent_last_question.get(conversation_id)
+                print("LAST QUESTION: ", last_question)
+                if last_question and "Is this summary correct?" in last_question and query.lower() == "yes":
+                    logger.info("Processing the chat and extracting details...")
+                    await ws_connection.send_message("Thank you! Your issue is being processed and logged.", websocket)
+                    
+                    # A. fetch the full conversation history
+                    logger.info('fetching the chat hisotry from database...')
+                    history = await get_chat_history_with_agent(conversation_id, app.state.database)
+                    transcript = "\n".join([f"{msg.sender.value}: {msg.message}" for msg in history])
+                    
+                    # B. use the extractor to get structured data
+                    logger.info("extracting details from conversation history...")
+                    extracted_data = await extractor.extract_issue_details(
+                        transcript=transcript,
+                        user_id=user_id,
+                        conversation_id=conversation_id
+                    )
+                    
+                    # C. create the user issue from the extracted data
+                    logger.info("creating user issue from extracted data...")
+                    issue = UserIssueCreate(**extracted_data)
+                    await create_user_issue(issue, app.state.database)
+                    logger.info("User issue saved to DB.")
+                    
+                    # D. Clean up and close the connection
+                    del agent_last_question[conversation_id]
+                    break # Exit the while loop to close the socket
+                
                 response = await assistant.run(query)
                 await ws_connection.send_message(json.dumps(response), websocket)
+                agent_response_text = response.get("response", "Sorry, something went wrong.")
+                # print("AGENT RESPONSE TEXT: ", agent_response_text)
                 logger.info(f"AI response: {response}")
+                
+                # Store the agent's question for the next loop
+                agent_last_question[conversation_id] = agent_response_text
+
+                # 4. Save agent message to DB
+                logger.info("Saving agent message to DB...")
+                agent_message = ChatMessageCreate(
+                    conversation_id=conversation_id,
+                    user_id=user_id, # The user_id is the same for the whole session
+                    sender=MessageSender.BOT,
+                    message=agent_response_text
+                )
+                await create_chat_message(agent_message, app.state.database)
+                logger.info("Agent message saved to DB.")
             except asyncio.TimeoutError:
                 await ws_connection.send_message(websocket, "Session timed out due to inactivity.")
                 await ws_connection.disconnect(websocket)
                 logger.error(f"WebSocket Session timed out due to inactivity.")
     except WebSocketDisconnect:
+        if conversation_id in agent_last_question:
+            del agent_last_question[conversation_id]
         ws_connection.disconnect(websocket)
-        logger.error("Error: WebSocket disconnected.")
+        logger.error(f"Client {user_id} disconnected.")
     except Exception as e:
         ws_connection.disconnect(websocket)
         logger.error(f"Error during chat: {e}")
@@ -100,3 +172,5 @@ async def chat(websocket: WebSocket):
                 
              
 app.include_router(db_router)
+app.include_router(seeker_router)
+app.include_router(chat_router)

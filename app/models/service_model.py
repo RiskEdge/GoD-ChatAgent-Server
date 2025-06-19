@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field, validator
 from typing import List, Optional
 from datetime import datetime
 from helper import PyObjectId
+from bson import ObjectId
 
 
 class FAQEntry(BaseModel):
