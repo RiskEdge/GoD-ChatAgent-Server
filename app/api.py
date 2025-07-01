@@ -27,10 +27,10 @@ from .routes.geek_routes import router as db_router
 from .routes.seeker_routes import seeker_router
 from .routes.chat_route import chat_router
 import warnings
-from pymongo.errors import UserWarning
+# from pymongo.errors import UserWarning
 
 # Suppress the specific CosmosDB warning
-warnings.filterwarnings("ignore", category=UserWarning, module="pymongo.synchronous.mongo_client")
+warnings.filterwarnings("ignore")
 
 app = FastAPI()
 logger = setup_logger("GoD AI Chatbot: Server", "app.log")
