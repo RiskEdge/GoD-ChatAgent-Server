@@ -19,6 +19,7 @@ class Tag(BaseModel):
         return v
 
     class Config:
-        allow_population_by_field_name = True
+        validate_by_name = True
+        from_attributes = True
         json_encoders = {ObjectId: str}
-        orm_mode = True
+        

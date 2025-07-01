@@ -62,9 +62,10 @@ class ServiceBase(BaseModel):
     updatedAt: Optional[datetime]
 
     class Config:
-        allow_population_by_field_name = True
+        validate_by_name = True
+        from_attributes = True
         json_encoders = {ObjectId: str}
-        orm_mode = True
+        
 
     @validator("slug")
     def slug_lowercase(cls, v):

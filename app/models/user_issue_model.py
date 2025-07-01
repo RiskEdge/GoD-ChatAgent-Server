@@ -47,6 +47,6 @@ class UserIssueInDB(UserIssueCreate):
     id: Optional[Union[str, PyObjectId]] = Field(default_factory=lambda: str(uuid.uuid4()), alias="_id")
 
     class Config:
-        allow_population_by_field_name = True
-        orm_mode = True
+        validate_by_name = True
+        from_attributes = True
         json_encoders = {ObjectId: str}

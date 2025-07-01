@@ -83,6 +83,6 @@ class SeekerBase(BaseModel):
         return values
 
     class Config:
-        allow_population_by_field_name = True
-        orm_mode = True
+        validate_by_name = True
+        from_attributes = True
         json_encoders = {ObjectId: str}
