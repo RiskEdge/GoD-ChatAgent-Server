@@ -85,12 +85,13 @@ async def index():
     return JSONResponse(status_code=200, content={"message": "Hello World!"})
 
 @app.websocket("/chat/{user_id}")
-async def chat(websocket: WebSocket, user_id: str):
+async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
     logger.info("Chat with agent initiated.")
     await ws_connection.connect(websocket)
     
     extractor = IssueExtractor()
-    conversation_id = str(uuid.uuid4())
+    print("CONVERSATION ID: ", conversation_id)
+    # conversation_id = str(uuid.uuid4())
     
     # callback_handler = WebSocketCallbackHandler(websocket, ws_connection)
     # assistant = ChatAssistantChain(callback_handler=callback_handler)
@@ -118,7 +119,7 @@ async def chat(websocket: WebSocket, user_id: str):
                 print("LAST QUESTION: ", last_question)
                 if last_question and "Is this summary correct?" in last_question and query.lower() == "yes":
                     logger.info("Processing the chat and extracting details...")
-                    await ws_connection.send_message("Thank you! Your issue is being processed and logged.", websocket)
+                    await ws_connection.send_message(json.dumps({'response': "Thank you! Your issue is being processed and we'll find a suitable geek for you shortly.", 'options': None}), websocket)
                     
                     # A. fetch the full conversation history
                     logger.info('fetching the chat hisotry from database...')
