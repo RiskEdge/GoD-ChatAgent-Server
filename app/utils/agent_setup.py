@@ -3,14 +3,23 @@ from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
-from pydantic import BaseModel
+from langchain_core.tools import Tool
+from langchain.agents import create_tool_calling_agent, AgentExecutor
+from pydantic import BaseModel, Field
 from typing import Optional, List
+
+from ..dependencies import get_database
+
+from .agent_tools import get_subcategories_by_category_slug, get_brands_by_category_slug
 
 from ..logs.logger import setup_logger
 
 class AgentResponse(BaseModel):
     response: str
     options: Optional[List] = None
+    
+class CategoryInput(BaseModel):
+    category_slug: str = Field(description="The lowercase slug of the main category (e.g., 'cloud-service-and-maintain').")
 
 
 logger = setup_logger("GoD AI Chatbot: Agent Setup", "app.log")
@@ -20,8 +29,12 @@ SYS_PROMPT="""You are a technical support agent whose role is to gather comprehe
 Always keep you messages crisp and short.
 
 Information to Collect:
+    Issue:
+        Category (will be the first message from the user)
+        Subcategory(use the tool to retrieve subcategories from the database using the category slug)
+        
     Device Details:
-        Brand and exact model
+        Brand(use the tool to retrieve brands from the database using the cateogry slug) and exact model
         Device type and specifications
         Operating system/software version
 
@@ -62,7 +75,14 @@ You MUST format your response as JSON using the following structure:
 {format_instructions}
 
 Response Field: Contains your question or statement to the user.
-Options Field: Contains 3-5 relevant answer choices when appropriate
+Options Field: Contains relevant answer choices when appropriate
+
+Examples for slug:
+    Category name: Video Collaboration - Service & Repair
+    category_slug: video-collaboration-service-and-repair
+    
+    Category name: Laptops - Desktop Service and Repair
+    category_slug: laptops-desktop-service-and-repair
 
 Have a look at the examples below to see what kind of options are appropriate based on the issue/device:
 For device brand: {{ {{"response"}}: "What brand is your device?", {{"options"}}: ["Apple", "Samsung", "Dell", "HP", "Other"]}}
@@ -73,23 +93,54 @@ You will be provided with conversation history to understand what information ha
 """
 
 class ChatAssistantChain:
-    def __init__(self, callback_handler=None):
-        self.memory = ConversationBufferMemory(return_messages=True)
+    def __init__(self, db_instance=None, callback_handler=None):
+        self.memory = ConversationBufferMemory(return_messages=True, memory_key="chat_history")
+        self.output_parser = parser
         self.callback_handler = callback_handler
         self.llm = ChatOpenAI(
             model="o4-mini", 
+            # temperature=0,
             # max_tokens=2000, 
             # streaming=True,
             # callbacks=[self.callback_handler] ,
         )
+        self.db_instance = db_instance
+        self.tools = []
+        if self.db_instance is not None:
+            self.tools.append(
+                Tool(
+                    name= "get_subcategories",
+                    description= f"""Retrieves a list of subcategory names for a given main category slug. 
+                    Use this when you ask the user about specific sub-category of services within a broader category. 
+                    The input parameter is 'category_slug'.""",
+                    func=lambda category_slug: get_subcategories_by_category_slug(db=db_instance, category_slug=category_slug),
+                    args_schema=CategoryInput,
+                )
+            )
+            self.tools.append(
+                Tool(
+                    name="get_brands",
+                    description="""
+                    Retrieves a list of brand names associated with a given category slug.
+                    Use this when you have to ask the user about brands available for a specific product category.
+                    The input parameter is 'category_slug'.
+                    """,
+                    func=lambda category_slug: get_brands_by_category_slug(db=db_instance, category_slug=category_slug),
+                    args_schema=CategoryInput 
+                )
+            )
+        else:
+            logger.warning("No tools initialized due to missing database connection.")
+            
         self.prompt = ChatPromptTemplate.from_messages(
                 [
                     ("system", SYS_PROMPT),
-                    MessagesPlaceholder(variable_name="history"),
+                    MessagesPlaceholder(variable_name="chat_history"),
                     ("human", "{input}"),
+                    MessagesPlaceholder(variable_name="agent_scratchpad"),
                 ]
             )
-        self.partial_prompt = self.prompt.partial(format_instructions=parser.get_format_instructions())
+        self.partial_prompt = self.prompt.partial(format_instructions=self.output_parser.get_format_instructions())
         logger.info("ChatAssistantChain initialized.")
 
     def get_memory_messages(self, query):
@@ -103,18 +154,23 @@ class ChatAssistantChain:
     
     def get_chain(self):
         try:
-            chain = (
-                RunnablePassthrough.assign(
-                    history=RunnableLambda(self.get_memory_messages)
-                )
-                |
-            self.partial_prompt
-                |
-            self.llm
-                |
-            parser
+            # chain = (
+            #     RunnablePassthrough.assign(history=RunnableLambda(self.get_memory_messages))|self.partial_prompt|self.llm|parser)
+            agent = create_tool_calling_agent(
+                llm=self.llm,
+                tools=self.tools,
+                prompt=self.partial_prompt
             )
-            logger.info("Chain initialized.")
+            
+            partial_chain = AgentExecutor(
+                agent=agent,
+                tools=self.tools,
+                memory=self.memory,
+                verbose=True
+            )
+            chain = partial_chain 
+            # | self.output_parser
+            logger.info("AgentExecutor chain initialized.")
             return chain
         except Exception as e:
             logger.error(f"Error initializing chain: {e}")
@@ -122,14 +178,17 @@ class ChatAssistantChain:
         
     async def run(self, user_input):
         try:
-            chain = self.get_chain()
+            agent_executor = self.get_chain()
             logger.info(f"Processing user input: {user_input}")
-            response = await chain.ainvoke({"input": user_input})
+            # response = await chain.ainvoke({"input": user_input})
+            response = await agent_executor.ainvoke({"input": user_input})
+            print("RESPONSE: ", type(response))
             logger.info(f"AI response: {response}")
             
-            self.memory.save_context({"input": user_input}, {"output": response["response"]})
+            # self.memory.save_context({"input": user_input}, {"output": response["response"]})
             logger.info("Memory updated.")
-            return response
+            return {"response": response["output"]}
+            # return response
         except Exception as e:
             logger.error(f"Error during chain execution: {e}")
             return None

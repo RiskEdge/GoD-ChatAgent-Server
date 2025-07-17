@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+from .helper import PyObjectId
 
 
 class Brand(BaseModel):
@@ -8,6 +9,7 @@ class Brand(BaseModel):
     slug: str = Field(..., description="Unique lowercase slug")
     description: Optional[str] = None
     image: Optional[str] = None
+    category: PyObjectId
     createdAt: Optional[datetime]
     updatedAt: Optional[datetime]
 

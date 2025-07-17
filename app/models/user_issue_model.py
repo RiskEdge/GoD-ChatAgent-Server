@@ -27,6 +27,10 @@ class ProblemDescription(BaseModel):
     frequency: Optional[str] = None
     trigger: Optional[str] = None
     troubleshooting_attempts: Optional[str] = None
+    
+class CategoryDetails(BaseModel):
+    category: Optional[str] = None
+    subcategory: Optional[str] = None
 
 class UserIssueBase(BaseModel):
     user_id: Optional[Union[str, PyObjectId]] = Field(..., description="The ID of the user reporting the issue.")
@@ -36,6 +40,7 @@ class UserIssueBase(BaseModel):
     device_details: DeviceDetails = None
     purchase_info: PurchaseInformation = None
     problem_description: ProblemDescription = None
+    category_details: CategoryDetails = None
     
     summary: str = Field(..., description="The final summary of the issue confirmed by the agent.")
 

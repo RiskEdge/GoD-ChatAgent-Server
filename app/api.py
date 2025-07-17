@@ -95,7 +95,7 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
     
     # callback_handler = WebSocketCallbackHandler(websocket, ws_connection)
     # assistant = ChatAssistantChain(callback_handler=callback_handler)
-    assistant = ChatAssistantChain()
+    assistant = ChatAssistantChain(db_instance=app.state.database)
     
     try:
         while True:
@@ -145,10 +145,11 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                     break # Exit the while loop to close the socket
                 
                 response = await assistant.run(query)
-                await ws_connection.send_message(json.dumps(response), websocket)
+                await ws_connection.send_message(response['response'], websocket)
                 agent_response_text = response.get("response", "Sorry, something went wrong.")
                 # print("AGENT RESPONSE TEXT: ", agent_response_text)
-                logger.info(f"AI response: {response}")
+                logger.info(f"AI response: {response['response']}")
+                logger.info(f" TYPE AI response: {type(response['response'])}")
                 
                 # Store the agent's question for the next loop
                 agent_last_question[conversation_id] = agent_response_text
