@@ -1,9 +1,11 @@
 from typing import List, Optional, Union
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, EmailStr
 from datetime import datetime, date
 from enum import Enum
 from bson import ObjectId
 from .helper import PyObjectId
+
+from .service_category import CategoryBase
 
 # Address Submodel
 class Coordinates(BaseModel):
@@ -30,10 +32,22 @@ class ModeOfServiceEnum(str, Enum):
     carry_in = 'Carry In'
     all = 'All'
     none = 'None'
+    
+class AuthProviderEnum(str, Enum):
+    google = 'google'
+    linkedin = 'linkedin'
+    microsoft = 'microsoft'
+    custom = 'custom'
 
 class IdProofTypeEnum(str, Enum):
     aadhar = 'Aadhar'
     pan = 'PAN'
+    
+class StatusEnum(str, Enum):
+    requested = 'Requested'
+    verified = 'Verified'
+    failed = 'Failed'
+    null = 'Null'
 
 # Submodels
 class RateCard(BaseModel):
@@ -77,16 +91,23 @@ class IdProof(BaseModel):
     type: IdProofTypeEnum = IdProofTypeEnum.aadhar
     idNumber: Optional[str] = None
     isAdhaarVerified: bool = False
+    status: StatusEnum = StatusEnum.null
+    requestId: Optional[str] = None
+    
+class ProfileImage(BaseModel):
+    public_id: Optional[str] = None
+    url: Optional[str] = None
 
 # Main Geek base model
 class GeekBase(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id")
     fullName: FullName
+    authProvider: AuthProviderEnum = AuthProviderEnum.custom
     email: EmailStr
     mobile: str
     isEmailVerified: bool = False
     isPhoneVerified: bool = False
-    profileImage: Optional[str] = None
+    profileImage: Optional[ProfileImage] = None
     primarySkill: PyObjectId
     secondarySkills: List[PyObjectId] = []
     description: Optional[str] = None
@@ -100,6 +121,7 @@ class GeekBase(BaseModel):
     yoe: int = Field(default=0)
     reviews: List[Review] = []
     authToken: Optional[str] = None
+    services: List[PyObjectId] = []
     type: str  # Discriminator ('Individual' or 'Corporate')
 
     model_config = {

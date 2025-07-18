@@ -8,7 +8,7 @@ import os
 import time
 import json
 import dotenv
-import uuid
+from datetime import date
 
 dotenv.load_dotenv()
 
@@ -16,9 +16,10 @@ from .logs.logger import setup_logger
 from .db.conn import db_client
 from .db.agent_chat_queries import create_chat_message, get_chat_history_with_agent
 from .db.user_issue_queries import create_user_issue
-from .utils.ws_connection import ConnectionManager, WebSocketCallbackHandler
+from .utils.ws_connection import ConnectionManager
 from .utils.agent_setup import ChatAssistantChain
 from .utils.issue_extractor import IssueExtractor
+from .utils.agent_tools import get_geeks_from_user_issue
 
 from .models.user_issue_model import UserIssueCreate
 from .models.agent_chat_model import ChatMessageCreate, MessageSender
@@ -34,6 +35,7 @@ warnings.filterwarnings("ignore")
 
 app = FastAPI()
 logger = setup_logger("GoD AI Chatbot: Server", "app.log")
+
 
 origins = [
     "http://localhost:5173",
@@ -119,7 +121,6 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                 print("LAST QUESTION: ", last_question)
                 if last_question and "Is this summary correct?" in last_question and query.lower() == "yes":
                     logger.info("Processing the chat and extracting details...")
-                    await ws_connection.send_message(json.dumps({'response': "Thank you! Your issue is being processed and we'll find a suitable geek for you shortly.", 'options': None}), websocket)
                     
                     # A. fetch the full conversation history
                     logger.info('fetching the chat hisotry from database...')
@@ -134,12 +135,17 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                         conversation_id=conversation_id
                     )
                     
+                    await ws_connection.send_message(json.dumps({'response': "Your issue is being processed and we'll find a suitable geek for you shortly.", 'options': None}), websocket)
+                    
                     # C. create the user issue from the extracted data
                     logger.info("creating user issue from extracted data...")
                     issue = UserIssueCreate(**extracted_data)
                     await create_user_issue(issue, app.state.database)
                     logger.info("User issue saved to DB.")
                     
+                    
+                    geeks = get_geeks_from_user_issue(app.state.database, issue)
+                    await ws_connection.send_message(json.dumps({'response': f"Please select a Geek to proceed", 'options': [geek.model_dump(by_alias=True) for geek in geeks]}), websocket)
                     # D. Clean up and close the connection
                     del agent_last_question[conversation_id]
                     break # Exit the while loop to close the socket

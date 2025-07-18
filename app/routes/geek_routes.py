@@ -1,9 +1,12 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 from pymongo.database import Database
 
 from ..logs.logger import setup_logger
 from ..dependencies import get_database
 from ..db.geek_queries import get_all_geeks, get_geek_by_id, get_all_services
+from ..utils.agent_tools import get_geeks_from_user_issue
+
+from ..models.user_issue_model import UserIssueInDB
 
 router = APIRouter(
     prefix="/geek_query",
@@ -51,4 +54,18 @@ async def get_service_categories(db: Database = Depends(get_database)):
         return {"categories": categories}
     except Exception as e:
         logger.error(f"Error getting service categories: {e}")
+        return {"error": str(e)}
+    
+@router.post("/get_geeks_from_user_issue")
+async def get_geeks_from_issue(db: Database = Depends(get_database), user_issue: UserIssueInDB = Body(...)):
+    try:
+        logger.info("Fetching geeks from user issue")
+        geeks = get_geeks_from_user_issue(db, user_issue)
+        if not geeks:
+            logger.error("Geeks not found")
+            raise HTTPException(status_code=404, detail="Geeks not found")
+        print(f"Found {len(geeks)} geeks from user issue")
+        return {"geeks": geeks}
+    except Exception as e:
+        logger.error(f"Error getting geeks from user issue: {e}")
         return {"error": str(e)}
