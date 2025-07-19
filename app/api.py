@@ -39,6 +39,7 @@ logger = setup_logger("GoD AI Chatbot: Server", "app.log")
 
 origins = [
     "http://localhost:5173",
+    "http://localhost:3000",
     "https://god-chatagent-client-production.up.railway.app"
 ]
 
