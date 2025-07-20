@@ -145,8 +145,11 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                     logger.info("User issue saved to DB.")
                     
                     
+                    logger.info("Fetching geeks from user issue")                   
                     geeks = get_geeks_from_user_issue(app.state.database, issue)
                     await ws_connection.send_message(json.dumps({'response': f"Please select a Geek to proceed", 'options': [geek.model_dump(by_alias=True) for geek in geeks]}), websocket)
+                    
+                    
                     # D. Clean up and close the connection
                     del agent_last_question[conversation_id]
                     break # Exit the while loop to close the socket

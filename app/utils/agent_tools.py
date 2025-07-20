@@ -296,9 +296,18 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB) -> List[d
 ]
     )
 
-    # 4. Execute the query
-    suitable_geeks_data = list(geeks_collection.aggregate(pipeline)) if pipeline else geeks_collection.find(query)
+    try:
+        # 4. Execute the query
+        suitable_geeks_data = list(geeks_collection.aggregate(pipeline)) if pipeline else geeks_collection.find(query)
+    except Exception as e:
+        logger.error(f"Error fetching geeks from user issue: {e}")
+        raise
+
     # suitable_geeks = [geek_data for geek_data in suitable_geeks_data]
-    suitable_geeks = [AggregatedGeekOutput(**geek_data) for geek_data in suitable_geeks_data]
+    try:
+        suitable_geeks = [AggregatedGeekOutput(**geek_data) for geek_data in suitable_geeks_data]
+    except Exception as e:
+        logger.error(f"Error creating AggregatedGeekOutput objects from suitable geeks data: {e}")
+        raise
 
     return suitable_geeks
