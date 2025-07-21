@@ -8,13 +8,12 @@ import os
 import time
 import json
 import dotenv
-from datetime import date
 
 dotenv.load_dotenv()
 
 from .logs.logger import setup_logger
 from .db.conn import db_client
-from .db.agent_chat_queries import create_chat_message, get_chat_history_with_agent
+from .db.agent_chat_queries import get_chat_history_with_agent, append_message_to_convo
 from .db.user_issue_queries import create_user_issue
 from .utils.ws_connection import ConnectionManager
 from .utils.agent_setup import ChatAssistantChain
@@ -22,7 +21,7 @@ from .utils.issue_extractor import IssueExtractor
 from .utils.agent_tools import get_geeks_from_user_issue
 
 from .models.user_issue_model import UserIssueCreate
-from .models.agent_chat_model import ChatMessageCreate, MessageSender
+from .models.agent_chat_model import ChatMessageBase, MessageSender
 
 from .routes.geek_routes import router as db_router
 from .routes.seeker_routes import seeker_router
@@ -88,7 +87,7 @@ async def index():
     return JSONResponse(status_code=200, content={"message": "Hello World!"})
 
 @app.websocket("/chat/{user_id}")
-async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
+async def chat(websocket: WebSocket, user_id: str, conversation_id: str, page: int, page_size: int = 5):
     logger.info("Chat with agent initiated.")
     await ws_connection.connect(websocket)
     
@@ -107,13 +106,11 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                 logger.info(f"Received message: {query}")
                 
                 # Creating user message from the pydantic model
-                user_message = ChatMessageCreate(
-                    conversation_id=conversation_id,
-                    user_id=user_id,
+                user_message = ChatMessageBase(
                     sender=MessageSender.USER,
                     message=query
                 )
-                await create_chat_message(user_message, app.state.database)
+                await append_message_to_convo(user_id, conversation_id, user_message, app.state.database)
                 logger.info("User message saved to DB.")
                 
                 # CHECK FOR COMPLETION TRIGGER
@@ -126,7 +123,7 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                     # A. fetch the full conversation history
                     logger.info('fetching the chat hisotry from database...')
                     history = await get_chat_history_with_agent(conversation_id, app.state.database)
-                    transcript = "\n".join([f"{msg.sender.value}: {msg.message}" for msg in history])
+                    transcript = "\n".join([f"{msg.sender.value}: {msg.message}" for msg in history[0].chat_messages])
                     
                     # B. use the extractor to get structured data
                     logger.info("extracting details from conversation history...")
@@ -146,7 +143,7 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                     
                     try:
                         logger.info("Fetching geeks from user issue")                   
-                        geeks = get_geeks_from_user_issue(app.state.database, issue)
+                        geeks = get_geeks_from_user_issue(app.state.database, issue, page=page, page_size=page_size)
                         logger.info("Geeks fetched: ", geeks)
                         if geeks: 
                             await ws_connection.send_message(json.dumps({'response': f"Please select a Geek to proceed", 'options': [geek.model_dump(by_alias=True) for geek in geeks]}), websocket)
@@ -163,21 +160,19 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                 await ws_connection.send_message(response['response'], websocket)
                 agent_response_text = response.get("response", "Sorry, something went wrong.")
                 # print("AGENT RESPONSE TEXT: ", agent_response_text)
-                logger.info(f"AI response: {response['response']}")
-                logger.info(f" TYPE AI response: {type(response['response'])}")
+                # logger.info(f"AI response: {response['response']}")
+                # logger.info(f" TYPE AI response: {type(response['response'])}")
                 
                 # Store the agent's question for the next loop
                 agent_last_question[conversation_id] = agent_response_text
 
                 # 4. Save agent message to DB
                 logger.info("Saving agent message to DB...")
-                agent_message = ChatMessageCreate(
-                    conversation_id=conversation_id,
-                    user_id=user_id, # The user_id is the same for the whole session
+                agent_message = ChatMessageBase(
                     sender=MessageSender.BOT,
                     message=agent_response_text
                 )
-                await create_chat_message(agent_message, app.state.database)
+                await append_message_to_convo(user_id, conversation_id, agent_message, app.state.database)
                 logger.info("Agent message saved to DB.")
             except asyncio.TimeoutError:
                 await ws_connection.send_message(websocket, "Session timed out due to inactivity.")

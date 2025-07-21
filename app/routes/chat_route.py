@@ -3,7 +3,7 @@ from pymongo.database import Database
 
 from ..logs.logger import setup_logger
 from ..dependencies import get_database
-from ..db.agent_chat_queries import create_chat_message, get_chat_history_with_agent, get_conversations_by_user
+from ..db.agent_chat_queries import get_chat_history_with_agent, get_conversations_by_user
 
 chat_router = APIRouter(
     prefix="/chat",
@@ -21,12 +21,12 @@ async def chat_history(conversation_id: str, db: Database = Depends(get_database
         if chat_history:
             print(chat_history)
             logger.info("Chat history fetched successfully")
-            return [{"role": message.sender, "content": message.message} for message in chat_history]
+            return chat_history
         else:
             logger.error("Chat history not found")
             return None
     except Exception as e:
-        logger.error("Error fetching chat history: ", e)
+        logger.error(f"Error fetching chat history with agent: {e}")
         raise HTTPException(status_code=500, detail="Error fetching chat history")
     
 @chat_router.get("/conversation/{user_id}")
@@ -42,5 +42,5 @@ async def get_conversation(user_id: str, db: Database = Depends(get_database)):
             logger.error("Conversation not found")
             return None
     except Exception as e:
-        logger.error("Error fetching conversation: ", e)
+        logger.error(f"Error fetching conversation: {e}")
         raise HTTPException(status_code=500, detail="Error fetching conversation")

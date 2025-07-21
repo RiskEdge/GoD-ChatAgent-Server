@@ -162,7 +162,7 @@ def get_brands_by_category_slug(db: Database, category_slug: str) -> List[str]:
         logger.error(f"An unexpected error occurred while fetching brands: {e}")
         raise
     
-def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB) -> List[dict]:
+def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int = 1, page_size: int = 5) -> List[dict]:
     """
     Finds suitable geeks based on a user issue.
 
@@ -245,6 +245,11 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB) -> List[d
     #             # A more robust solution might involve building a list of conditions and then combining.
     #             pass # For now, let's keep it simple for demonstration.
 
+
+    skip_amount = (page - 1) * page_size
+    if skip_amount < 0:
+        skip_amount = 0
+    
     #Construct pipeline
     pipeline = []
     
@@ -292,9 +297,10 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB) -> List[d
              "services": 1,
                 "type": 1, # <--- MUST BE INCLUDED
         }
+    }, { "$skip": skip_amount
+    }, { "$limit": page_size
     }
-]
-    )
+]   )
 
     try:
         # 4. Execute the query
