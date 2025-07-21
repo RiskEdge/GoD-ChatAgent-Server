@@ -103,7 +103,7 @@ class GeekBase(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id")
     fullName: FullName
     authProvider: AuthProviderEnum = AuthProviderEnum.custom
-    email: EmailStr
+    email: EmailStr = None
     mobile: str
     isEmailVerified: bool = False
     isPhoneVerified: bool = False
@@ -121,7 +121,7 @@ class GeekBase(BaseModel):
     yoe: int = Field(default=0)
     reviews: List[Review] = []
     authToken: Optional[str] = None
-    services: List[PyObjectId] = []
+    # services: List[PyObjectId] = []
     type: str  # Discriminator ('Individual' or 'Corporate')
 
     model_config = {

@@ -272,7 +272,7 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB) -> List[d
             '_id': 1,
             "fullName": 1, # <--- MUST BE INCLUDED
                 "authProvider": 1,
-                "email": 1, # <--- MUST BE INCLUDED
+                # "email": 1, # <--- MUST BE INCLUDED
                 "mobile": 1, # <--- MUST BE INCLUDED
                 "isEmailVerified": 1,
                 "isPhoneVerified": 1,

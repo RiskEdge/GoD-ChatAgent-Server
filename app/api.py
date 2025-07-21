@@ -144,11 +144,16 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                     await create_user_issue(issue, app.state.database)
                     logger.info("User issue saved to DB.")
                     
-                    
-                    logger.info("Fetching geeks from user issue")                   
-                    geeks = get_geeks_from_user_issue(app.state.database, issue)
-                    await ws_connection.send_message(json.dumps({'response': f"Please select a Geek to proceed", 'options': [geek.model_dump(by_alias=True) for geek in geeks]}), websocket)
-                    
+                    try:
+                        logger.info("Fetching geeks from user issue")                   
+                        geeks = get_geeks_from_user_issue(app.state.database, issue)
+                        logger.info("Geeks fetched: ", geeks)
+                        if geeks: 
+                            await ws_connection.send_message(json.dumps({'response': f"Please select a Geek to proceed", 'options': [geek.model_dump(by_alias=True) for geek in geeks]}), websocket)
+                        else:
+                            await ws_connection.send_message(json.dumps({"response": "No suitable geeks found", "options":None}), websocket)
+                    except Exception as e:
+                        logger.error(f"Error fetching geeks from user issue: {e}")
                     
                     # D. Clean up and close the connection
                     del agent_last_question[conversation_id]
