@@ -87,7 +87,7 @@ async def index():
     return JSONResponse(status_code=200, content={"message": "Hello World!"})
 
 @app.websocket("/chat/{user_id}")
-async def chat(websocket: WebSocket, user_id: str, conversation_id: str, page: int, page_size: int = 5):
+async def chat(websocket: WebSocket, user_id: str, conversation_id: str, page: int = 1, page_size: int = 5):
     logger.info("Chat with agent initiated.")
     await ws_connection.connect(websocket)
     
