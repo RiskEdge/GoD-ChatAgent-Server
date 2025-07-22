@@ -1,6 +1,8 @@
 from ..logs.logger import setup_logger
 from typing import List
 from typing import Optional
+from pydantic import BaseModel
+import math
 
 from bson import ObjectId
 from pymongo.database import Database
@@ -15,6 +17,14 @@ logger = setup_logger("GoD AI Chatbot: Agent Tools", "app.log")
 class AggregatedGeekOutput(GeekBase):
     primarySkillName: Optional[str] = None
     secondarySkillsNames: Optional[List[str]] = None
+    
+class PaginatedGeekResponse(BaseModel):
+    geeks: List[AggregatedGeekOutput] = []
+    total: int
+    limit: int = 5
+    page: int = 1
+    pages: int
+    user_issue: UserIssueInDB
 
 def get_categories(db: Database) -> List[str]:
     """
@@ -162,7 +172,7 @@ def get_brands_by_category_slug(db: Database, category_slug: str) -> List[str]:
         logger.error(f"An unexpected error occurred while fetching brands: {e}")
         raise
     
-def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int = 1, page_size: int = 5) -> List[dict]:
+def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int = 1, page_size: int = 5) -> PaginatedGeekResponse:
     """
     Finds suitable geeks based on a user issue.
 
@@ -297,21 +307,41 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
              "services": 1,
                 "type": 1, # <--- MUST BE INCLUDED
         }
-    }, { "$skip": skip_amount
-    }, { "$limit": page_size
+    # },
+    }, {
+        '$facet': {
+            'geeks': [
+                {'$skip': skip_amount},
+                {'$limit': page_size}
+            ],
+            'totalCount': [
+                {'$count': 'count'}
+            ]
+        }
     }
 ]   )
 
     try:
         # 4. Execute the query
-        suitable_geeks_data = list(geeks_collection.aggregate(pipeline)) if pipeline else geeks_collection.find(query)
+        data = list(geeks_collection.aggregate(pipeline)) if pipeline else geeks_collection.find(query)
+        geeks = data[0]['geeks']
+        total = data[0]['totalCount'][0]['count']
+        
+        
     except Exception as e:
         logger.error(f"Error fetching geeks from user issue: {e}")
         raise
-
-    # suitable_geeks = [geek_data for geek_data in suitable_geeks_data]
+    
     try:
-        suitable_geeks = [AggregatedGeekOutput(**geek_data) for geek_data in suitable_geeks_data]
+        geek_data = {
+            "geeks": geeks,
+            "total": total,
+            "limit": page_size,
+            "page": page,
+            "pages": math.ceil(total/page_size),
+            "user_issue": user_issue
+        }
+        suitable_geeks = PaginatedGeekResponse(**geek_data)
     except Exception as e:
         logger.error(f"Error creating AggregatedGeekOutput objects from suitable geeks data: {e}")
         raise

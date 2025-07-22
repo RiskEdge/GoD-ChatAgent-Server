@@ -87,16 +87,12 @@ async def index():
     return JSONResponse(status_code=200, content={"message": "Hello World!"})
 
 @app.websocket("/chat/{user_id}")
-async def chat(websocket: WebSocket, user_id: str, conversation_id: str, page: int = 1, page_size: int = 5):
+async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
     logger.info("Chat with agent initiated.")
     await ws_connection.connect(websocket)
     
     extractor = IssueExtractor()
-    print("CONVERSATION ID: ", conversation_id)
-    # conversation_id = str(uuid.uuid4())
     
-    # callback_handler = WebSocketCallbackHandler(websocket, ws_connection)
-    # assistant = ChatAssistantChain(callback_handler=callback_handler)
     assistant = ChatAssistantChain(db_instance=app.state.database)
     
     try:
@@ -105,61 +101,73 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str, page: i
                 query = await ws_connection.receive_message(websocket)
                 logger.info(f"Received message: {query}")
                 
-                # Creating user message from the pydantic model
-                user_message = ChatMessageBase(
-                    sender=MessageSender.USER,
-                    message=query
-                )
-                await append_message_to_convo(user_id, conversation_id, user_message, app.state.database)
-                logger.info("User message saved to DB.")
+                try:
+                    query = json.loads(query)
+                    is_continuation = query['action'] == "continue_conversation"
+                except json.JSONDecodeError:
+                    query = query
+                    is_continuation = False
                 
-                # CHECK FOR COMPLETION TRIGGER
-                # If the agent;s last message was the confirmation prompt and user says 'yes'
-                last_question = agent_last_question.get(conversation_id)
-                print("LAST QUESTION: ", last_question)
-                if last_question and "Is this summary correct?" in last_question and query.lower() == "yes":
-                    logger.info("Processing the chat and extracting details...")
-                    
-                    # A. fetch the full conversation history
-                    logger.info('fetching the chat hisotry from database...')
-                    history = await get_chat_history_with_agent(conversation_id, app.state.database)
-                    transcript = "\n".join([f"{msg.sender.value}: {msg.message}" for msg in history[0].chat_messages])
-                    
-                    # B. use the extractor to get structured data
-                    logger.info("extracting details from conversation history...")
-                    extracted_data = await extractor.extract_issue_details(
-                        transcript=transcript,
-                        user_id=user_id,
-                        conversation_id=conversation_id
+                if not is_continuation:
+                    # Creating user message from the pydantic model
+                    user_message = ChatMessageBase(
+                        sender=MessageSender.USER,
+                        message=query
                     )
+                    await append_message_to_convo(user_id, conversation_id, user_message, app.state.database)
+                    logger.info("User message saved to DB.")
                     
-                    await ws_connection.send_message(json.dumps({'response': "Your issue is being processed and we'll find a suitable geek for you shortly.", 'options': None}), websocket)
-                    
-                    # C. create the user issue from the extracted data
-                    logger.info("creating user issue from extracted data...")
-                    issue = UserIssueCreate(**extracted_data)
-                    await create_user_issue(issue, app.state.database)
-                    logger.info("User issue saved to DB.")
-                    
-                    try:
-                        logger.info("Fetching geeks from user issue")                   
-                        geeks = get_geeks_from_user_issue(app.state.database, issue, page=page, page_size=page_size)
-                        logger.info("Geeks fetched: ", geeks)
-                        if geeks: 
-                            await ws_connection.send_message(json.dumps({'response': f"Please select a Geek to proceed", 'options': [geek.model_dump(by_alias=True) for geek in geeks]}), websocket)
-                        else:
-                            await ws_connection.send_message(json.dumps({"response": "No suitable geeks found", "options":None}), websocket)
-                    except Exception as e:
-                        logger.error(f"Error fetching geeks from user issue: {e}")
-                    
-                    # D. Clean up and close the connection
-                    del agent_last_question[conversation_id]
-                    break # Exit the while loop to close the socket
+                    # CHECK FOR COMPLETION TRIGGER
+                    # If the agent;s last message was the confirmation prompt and user says 'yes'
+                    last_question = agent_last_question.get(conversation_id)
+                    print("LAST QUESTION: ", last_question)
+                    if last_question and "Is this summary correct?" in last_question and query.lower() == "yes":
+                        logger.info("Processing the chat and extracting details...")
+                        
+                        # A. fetch the full conversation history
+                        logger.info('fetching the chat hisotry from database...')
+                        history = await get_chat_history_with_agent(conversation_id, app.state.database)
+                        transcript = "\n".join([f"{msg.sender.value}: {msg.message}" for msg in history[0].chat_messages])
+                        
+                        # B. use the extractor to get structured data
+                        logger.info("extracting details from conversation history...")
+                        extracted_data = await extractor.extract_issue_details(
+                            transcript=transcript,
+                            user_id=user_id,
+                            conversation_id=conversation_id
+                        )
+                        
+                        await ws_connection.send_message(json.dumps({'response': "Your issue is being processed and we'll find a suitable geek for you shortly.", 'options': None}), websocket)
+                        
+                        # C. create the user issue from the extracted data
+                        logger.info("creating user issue from extracted data...")
+                        issue = UserIssueCreate(**extracted_data)
+                        await create_user_issue(issue, app.state.database)
+                        logger.info("User issue saved to DB.")
+                        
+                        try:
+                            logger.info("Fetching geeks from user issue")                   
+                            geeks = get_geeks_from_user_issue(app.state.database, issue, page=1, page_size=5)
+                            logger.info("Geeks fetched: ", geeks)
+                            if geeks: 
+                                await ws_connection.send_message(json.dumps({'response': f"Please select a Geek to proceed", 'options': [geeks.model_dump_json()]}), websocket)
+                            else:
+                                await ws_connection.send_message(json.dumps({"response": "No suitable geeks found", "options":None}), websocket)
+                        except Exception as e:
+                            logger.error(f"Error fetching geeks from user issue: {e}")
+                        
+                        # D. Clean up and close the connection
+                        del agent_last_question[conversation_id]
+                        break # Exit the while loop to close the socket
                 
-                response = await assistant.run(query)
+                    response = await assistant.run(query)
+                    
+                else:
+                    response = await assistant.run(json.dumps(query['chat_history']))
+                    
                 await ws_connection.send_message(response['response'], websocket)
                 agent_response_text = response.get("response", "Sorry, something went wrong.")
-                # print("AGENT RESPONSE TEXT: ", agent_response_text)
+                print("AGENT RESPONSE TEXT: ", agent_response_text)
                 # logger.info(f"AI response: {response['response']}")
                 # logger.info(f" TYPE AI response: {type(response['response'])}")
                 
@@ -170,7 +178,7 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str, page: i
                 logger.info("Saving agent message to DB...")
                 agent_message = ChatMessageBase(
                     sender=MessageSender.BOT,
-                    message=agent_response_text
+                    message=json.loads(agent_response_text)["response"]
                 )
                 await append_message_to_convo(user_id, conversation_id, agent_message, app.state.database)
                 logger.info("Agent message saved to DB.")

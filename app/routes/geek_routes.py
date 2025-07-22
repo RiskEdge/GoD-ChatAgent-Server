@@ -57,15 +57,15 @@ async def get_service_categories(db: Database = Depends(get_database)):
         return {"error": str(e)}
     
 @router.post("/get_geeks_from_user_issue")
-async def get_geeks_from_issue(db: Database = Depends(get_database), user_issue: UserIssueInDB = Body(...)):
+async def get_geeks_from_issue(db: Database = Depends(get_database), user_issue: UserIssueInDB = Body(...), page: int = 1, page_size: int = 5):
     try:
         logger.info("Fetching geeks from user issue")
-        geeks = get_geeks_from_user_issue(db, user_issue)
+        geeks = get_geeks_from_user_issue(db, user_issue, page=page, page_size=page_size)
         if not geeks:
             logger.error("Geeks not found")
             raise HTTPException(status_code=404, detail="Geeks not found")
-        print(f"Found {len(geeks)} geeks from user issue")
-        return {"geeks": geeks}
+        # print(f"Found {len(geeks)} geeks from user issue")
+        return geeks
     except Exception as e:
         logger.error(f"Error getting geeks from user issue: {e}")
         return {"error": str(e)}

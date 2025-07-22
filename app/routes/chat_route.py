@@ -24,7 +24,7 @@ async def chat_history(conversation_id: str, db: Database = Depends(get_database
             return chat_history
         else:
             logger.error("Chat history not found")
-            return None
+            return []
     except Exception as e:
         logger.error(f"Error fetching chat history with agent: {e}")
         raise HTTPException(status_code=500, detail="Error fetching chat history")
@@ -44,3 +44,18 @@ async def get_conversation(user_id: str, db: Database = Depends(get_database)):
     except Exception as e:
         logger.error(f"Error fetching conversation: {e}")
         raise HTTPException(status_code=500, detail="Error fetching conversation")
+    
+@chat_router.delete("/delete/{conversation_id}")
+async def delete_conversation(conversation_id: str, db: Database = Depends(get_database)):
+    try:
+        logger.info(f"Deleting conversation with id: {conversation_id}")
+        result = db.chat_messages_with_bot.delete_many({"conversation_id": conversation_id})
+        if result.deleted_count > 0:
+            logger.info(f"Conversation with id {conversation_id} deleted successfully")
+            return {"message": f"Conversation with id {conversation_id} deleted successfully"}
+        else:
+            logger.error(f"Conversation with id {conversation_id} not found")
+            raise HTTPException(status_code=404, detail=f"Conversation with id {conversation_id} not found")
+    except Exception as e:
+        logger.error(f"Error deleting conversation: {e}")
+        raise HTTPException(status_code=500, detail="Error deleting conversation")
