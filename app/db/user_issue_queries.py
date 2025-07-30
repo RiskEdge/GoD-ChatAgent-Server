@@ -9,7 +9,7 @@ logger = setup_logger("GoD AI Chatbot: User Issue Query", "app.log")
 
 async def create_user_issue(issue: UserIssueCreate, db: Database) -> UserIssueInDB:
     try:
-        issue_dict = issue.dict()
+        issue_dict = issue.model_dump()
         logger.info("Inserting issue to DB")
         db.user_issues.insert_one(issue_dict)
         logger.info("Issue inserted to DB successfully.")

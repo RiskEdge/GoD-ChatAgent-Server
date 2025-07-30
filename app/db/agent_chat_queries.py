@@ -25,8 +25,8 @@ async def append_message_to_convo(user_id: str, conversation_id: str, message: C
         db.chat_messages_with_bot.update_one(
             {"conversation_id": conversation_id}, 
             {
-                "$setOnInsert": {"user_id": user_id},
-            # {"$setOnInsert": {"user_id": ObjectId(user_id)}},
+                # "$setOnInsert": {"user_id": user_id},
+            "$setOnInsert": {"user_id": ObjectId(user_id)},
             "$push": {"chat_messages": message.dict()}},
         upsert=True)
         logger.info("Message appended to conversation successfully.")
@@ -77,7 +77,7 @@ async def get_conversations_by_user(user_id: str, db: Database) -> List[dict]:
     try:
         pipeline = [
         {
-            "$match": {"user_id": user_id}
+            "$match": {"user_id": ObjectId(user_id)}
         },
         {
             "$sort": {"created_at": 1}
