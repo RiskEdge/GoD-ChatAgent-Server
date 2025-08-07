@@ -4,7 +4,7 @@ from pymongo.database import Database
 from ..logs.logger import setup_logger
 from ..dependencies import get_database
 from ..db.geek_queries import get_all_geeks, get_geek_by_id, get_all_services
-from ..utils.agent_tools import get_geeks_from_user_issue
+from ..utils.agent_tools import get_geeks_from_user_issue, get_subcategories_by_category_slug
 
 from ..models.user_issue_model import UserIssueInDB
 
@@ -54,6 +54,19 @@ async def get_service_categories(db: Database = Depends(get_database)):
         return {"categories": categories}
     except Exception as e:
         logger.error(f"Error getting service categories: {e}")
+        return {"error": str(e)}
+    
+@router.get("/get_subcategories_from_slug/{slug}")
+async def get_slug_subcategories( slug: str, db: Database = Depends(get_database)):
+    try:
+        logger.info(f"Fetching subcategories from slug: {slug}")
+        subcategories = get_subcategories_by_category_slug(db=db, category_slug=slug)
+        if not subcategories:
+            logger.error("Subcategories not found")
+            raise HTTPException(status_code=404, detail="Subcategories not found")
+        return  subcategories
+    except Exception as e:
+        logger.error(f"Error getting subcategories from slug: {e}")
         return {"error": str(e)}
     
 @router.post("/get_geeks_from_user_issue")

@@ -182,6 +182,8 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
     Returns:
         A list of suitable GeekBase objects.
     """
+    
+    logger.info(f"Fetching geeks for user issue: {user_issue.id}")
     query = {}
     skill_ids = []
     
@@ -189,7 +191,13 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
     categories_collection = db.categories
     subcategories_collection = db.subcategories
     
-    user = db.users.find_one({"_id": ObjectId(user_issue.user_id)}, {"address": 1})
+    try:
+    
+        user = db.users.find_one({"_id": ObjectId(user_issue.user_id)}, {"address": 1})
+        # print(user)
+    except Exception as e:
+        logger.error(f"Error fetching user's address: {e}")
+        return {"error": str(e)}
 
     # 1. Match Category and Subcategory with Skills
     if user_issue.category_details and user_issue.category_details.category:
@@ -225,11 +233,11 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
     if query:
         pipeline.append({"$match": query})
         
-    if user.address:
+    if user["address"]:
         pipeline.append({"$match": {
         "$or": [
-            {"address.city": user.address.city},
-            {"address.state": user.address.state}
+            {"address.city": user["address"]["city"]},
+            {"address.state": user["address"]["state"]}
         ]
     }})
         

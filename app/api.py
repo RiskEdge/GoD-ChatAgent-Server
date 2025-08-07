@@ -8,6 +8,7 @@ import os
 import time
 import json
 import dotenv
+from bson import ObjectId
 
 dotenv.load_dotenv()
 
@@ -134,7 +135,7 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                         logger.info("extracting details from conversation history...")
                         extracted_data = await extractor.extract_issue_details(
                             transcript=transcript,
-                            user_id=user_id,
+                            user_id=ObjectId(user_id),
                             conversation_id=conversation_id
                         )
                         
@@ -143,13 +144,13 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                         # C. create the user issue from the extracted data
                         logger.info("creating user issue from extracted data...")
                         issue = UserIssueCreate(**extracted_data)
-                        await create_user_issue(issue, app.state.database)
+                        issue_in_db = await create_user_issue(issue, app.state.database)
                         logger.info("User issue saved to DB.")
                         
                         try:
-                            logger.info("Fetching geeks from user issue")                   
-                            geeks = get_geeks_from_user_issue(app.state.database, issue, page=1, page_size=5)
-                            logger.info("Geeks fetched: ", geeks)
+                            logger.info(f"Fetching geeks from user issue: {issue}")                   
+                            geeks = get_geeks_from_user_issue(app.state.database, issue_in_db, page=1, page_size=5)
+                            logger.info(f"Geeks fetched: {len(geeks)}")
                             if geeks: 
                                 await ws_connection.send_message(json.dumps({'response': f"Please select a Geek to proceed", 'options': [geeks.model_dump_json()]}), websocket)
                             else:
@@ -168,9 +169,7 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                     
                 await ws_connection.send_message(response['response'], websocket)
                 agent_response_text = response.get("response", "Sorry, something went wrong.")
-                print("AGENT RESPONSE TEXT: ", agent_response_text)
-                # logger.info(f"AI response: {response['response']}")
-                # logger.info(f" TYPE AI response: {type(response['response'])}")
+                # print("AGENT RESPONSE TEXT: ", agent_response_text)
                 
                 # Store the agent's question for the next loop
                 agent_last_question[conversation_id] = agent_response_text

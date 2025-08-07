@@ -44,6 +44,7 @@ class UserIssueBase(BaseModel):
     conversation_id: str = Field(..., description="The ID of the conversation where this issue was reported.")
     status: IssueStatus = Field(default=IssueStatus.OPEN, description="The current status of the issue.")
     modeOfService: ModeEnum = Field(default=ModeEnum.All, description="The mode of service for the issue.")
+    location: Optional[str] = None
     
     device_details: DeviceDetails = None
     purchase_info: PurchaseInformation = None

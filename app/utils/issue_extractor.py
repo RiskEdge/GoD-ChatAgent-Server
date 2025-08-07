@@ -19,7 +19,7 @@ class IssueExtractor:
             ---
             {transcript}
             ---
-            Based on the transcript, extract the device details, purchase information, and problem description. Also, create a final summary of the user's issue. If a piece of information is missing, use `null`.
+            Based on the transcript, extract the device details, purchase information, problem description and service details. Also, create a final summary of the user's issue. If a piece of information is missing, use `null`.
 
             {format_instructions}
             """

@@ -108,6 +108,8 @@ class GeekBase(BaseModel):
     isEmailVerified: bool = False
     isPhoneVerified: bool = False
     profileImage: Optional[ProfileImage] = None
+    public_id: Optional[str] = None
+    url: Optional[str] = None
     primarySkill: PyObjectId
     secondarySkills: List[PyObjectId] = []
     description: Optional[str] = None
@@ -121,8 +123,10 @@ class GeekBase(BaseModel):
     yoe: int = Field(default=0)
     reviews: List[Review] = []
     authToken: Optional[str] = None
-    # services: List[PyObjectId] = []
-    type: str  # Discriminator ('Individual' or 'Corporate')
+    services: List[PyObjectId] = []
+    language_preferences: List[str] = []
+    requests: List[PyObjectId] = []
+    type: str = None # Discriminator ('Individual' or 'Corporate')
 
     model_config = {
         "populate_by_name": True,
