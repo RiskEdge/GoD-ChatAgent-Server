@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Union
 from datetime import datetime, date, timezone
 import uuid
+from enum import Enum
 from bson import ObjectId
 
 from .agent_chat_model import IssueStatus
@@ -9,6 +10,12 @@ from .helper import PyObjectId
 
 
 # --- Models for storing the structured user issue ---
+
+class ModeEnum(str, Enum):
+    Online = "Online"
+    Offline = "Offline"
+    All = "All"
+    CarryIn = "Carry In"
 
 class DeviceDetails(BaseModel):
     brand: Optional[str] = None
@@ -36,6 +43,7 @@ class UserIssueBase(BaseModel):
     user_id: Optional[Union[str, PyObjectId]] = Field(..., description="The ID of the user reporting the issue.")
     conversation_id: str = Field(..., description="The ID of the conversation where this issue was reported.")
     status: IssueStatus = Field(default=IssueStatus.OPEN, description="The current status of the issue.")
+    modeOfService: ModeEnum = Field(default=ModeEnum.All, description="The mode of service for the issue.")
     
     device_details: DeviceDetails = None
     purchase_info: PurchaseInformation = None

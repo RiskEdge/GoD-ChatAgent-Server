@@ -225,7 +225,8 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
     if query:
         pipeline.append({"$match": query})
         
-    pipeline.append({"$match": {
+    if user.address:
+        pipeline.append({"$match": {
         "$or": [
             {"address.city": user.address.city},
             {"address.state": user.address.state}

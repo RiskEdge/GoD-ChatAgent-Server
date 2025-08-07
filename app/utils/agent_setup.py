@@ -50,6 +50,9 @@ Information to Collect:
         When the issue occurs (patterns, frequency)
         What triggers the problem
         Previous troubleshooting attempts
+    Service Details:
+        Mode of service (Online, Offline, Carry In or All)
+        If the mode of service is offline, then ask the user's location(city/state/zip code)
 
 Communication Guidelines:
     Ask clear, focused questions only one at a time
