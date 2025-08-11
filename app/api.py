@@ -41,7 +41,7 @@ origins = [
     "http://localhost:5173",
     "http://localhost:3000",
     "https://god-chatagent-client-production.up.railway.app"
-    "https://god-ui.vercel.app/"
+    "https://god-ui.vercel.app"
 ]
 
 app.add_middleware(
