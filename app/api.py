@@ -114,7 +114,7 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                     # Creating user message from the pydantic model
                     user_message = ChatMessageBase(
                         sender=MessageSender.USER,
-                        message=query
+                        message=str(query)
                     )
                     await append_message_to_convo(user_id, conversation_id, user_message, app.state.database)
                     logger.info("User message saved to DB.")

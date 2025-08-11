@@ -3,6 +3,7 @@ from typing import List
 from typing import Optional
 from pydantic import BaseModel
 import math
+import re
 
 from bson import ObjectId
 from pymongo.database import Database
@@ -193,7 +194,7 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
     
     try:
     
-        user = db.users.find_one({"_id": ObjectId(user_issue.user_id)}, {"address": 1})
+        user = db.users.find_one({"_id": ObjectId(user_issue.user_id)})
         # print(user)
     except Exception as e:
         logger.error(f"Error fetching user's address: {e}")
@@ -233,13 +234,30 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
     if query:
         pipeline.append({"$match": query})
         
-    if user["address"]:
-        pipeline.append({"$match": {
-        "$or": [
-            {"address.city": user["address"]["city"]},
-            {"address.state": user["address"]["state"]}
-        ]
-    }})
+    if user.get("address"):  
+        city = user["address"].get("city")
+        state = user["address"].get("state")
+
+        # Only add $match if at least one is present
+        if city or state:
+            or_conditions = []
+            if city:
+                or_conditions.append({"address.city": city})
+            if state:
+                or_conditions.append({"address.state": state})
+
+            pipeline.append({"$match": {"$or": or_conditions}})
+            
+    if user_issue.location:
+            if user_issue.location:
+                pipeline.append({"$match": {
+                    "$or": [
+                            {"address.line1": {"$regex": re.escape(user_issue.location), "$options": "i"}},
+                            {"address.line2": {"$regex": re.escape(user_issue.location), "$options": "i"}},
+                            {"address.city":  {"$regex": re.escape(user_issue.location), "$options": "i"}},
+                            {"address.state": {"$regex": re.escape(user_issue.location), "$options": "i"}},
+                            ]
+                }})
         
     pipeline.extend(
             [
