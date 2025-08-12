@@ -77,7 +77,7 @@ async def get_geeks_from_issue(db: Database = Depends(get_database), user_issue:
         if not geeks:
             logger.error("Geeks not found")
             raise HTTPException(status_code=404, detail="Geeks not found")
-        if len(geeks.geeks) == 0:
+        if len(geeks["geeks"]) == 0:
             logger.info("No matching geeks found for user issue")
             raise HTTPException(status_code=404, detail="No matching geeks found for user issue")
         return geeks
