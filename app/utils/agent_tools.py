@@ -313,6 +313,8 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
             }
         }
     ]   )
+    
+    print(pipeline)
 
     try:
         # 4. Execute the query
