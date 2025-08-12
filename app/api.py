@@ -150,7 +150,7 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                         try:
                             logger.info(f"Fetching geeks from user issue: {issue}")                   
                             geeks = get_geeks_from_user_issue(app.state.database, issue_in_db, page=1, page_size=5)
-                            logger.info(f"Geeks fetched: {len(geeks)}")
+                            logger.info(f"Geeks fetched: {len(geeks.geeks)}")
                             if geeks: 
                                 await ws_connection.send_message(json.dumps({'response': f"Please select a Geek to proceed", 'options': [geeks.model_dump_json()]}), websocket)
                             else:
