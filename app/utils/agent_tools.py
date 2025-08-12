@@ -340,4 +340,4 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
         logger.error(f"Error creating AggregatedGeekOutput objects from suitable geeks data: {e}")
         raise
 
-    return suitable_geeks.model_dump()
+    return suitable_geeks
