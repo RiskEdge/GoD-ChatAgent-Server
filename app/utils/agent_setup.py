@@ -203,8 +203,8 @@ class ChatAssistantChain:
             logger.info(f"Processing user input: {user_input}")
             # response = await chain.ainvoke({"input": user_input})
             response = await agent_executor.ainvoke({"input": user_input})
-            print("RESPONSE: ", type(response))
-            logger.info(f"AI response: {response}")
+            # print("RESPONSE: ", type(response))
+            # logger.info(f"AI response: {response}")
             
             # self.memory.save_context({"input": user_input}, {"output": response["response"]})
             logger.info("Memory updated.")

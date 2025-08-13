@@ -234,7 +234,7 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
     if query:
         pipeline.append({"$match": query})
         
-    if user.get("address"):  
+    if user.get("address") and user_issue.modeOfService != "Online" and not user_issue.location:  
         city = user["address"].get("city")
         state = user["address"].get("state")
 
@@ -249,15 +249,22 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
             pipeline.append({"$match": {"$or": or_conditions}})
             
     if user_issue.modeOfService != "Online" and user_issue.location:
-            if user_issue.location:
-                pipeline.append({"$match": {
-                    "$or": [
-                            {"address.line1": {"$regex": re.escape(user_issue.location), "$options": "i"}},
-                            {"address.line2": {"$regex": re.escape(user_issue.location), "$options": "i"}},
-                            {"address.city":  {"$regex": re.escape(user_issue.location), "$options": "i"}},
-                            {"address.state": {"$regex": re.escape(user_issue.location), "$options": "i"}},
-                            ]
-                }})
+        tokens = re.split(r'\W+', user_issue.location)
+        
+        tokens = [t for t in tokens if t]
+        
+        if tokens:
+            for token in tokens:
+                if user_issue.location:
+                    pipeline.append({"$match": {
+                        "$or": [
+                                {"address.line1": {"$regex": re.escape(token), "$options": "i"}},
+                                {"address.line2": {"$regex": re.escape(token), "$options": "i"}},
+                                {"address.city":  {"$regex": re.escape(token), "$options": "i"}},
+                                {"address.state": {"$regex": re.escape(token), "$options": "i"}},
+                                {"address.pin": {"$regex": re.escape(token), "$options": "i"}},
+                                ]
+                    }})
         
     pipeline.extend(
             [
@@ -314,7 +321,7 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
         }
     ]   )
     
-    print(pipeline)
+    # print(pipeline)
 
     try:
         # 4. Execute the query

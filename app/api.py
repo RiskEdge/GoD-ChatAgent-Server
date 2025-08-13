@@ -105,9 +105,13 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                 
                 try:
                     query = json.loads(query)
-                    is_continuation = query['action'] == "continue_conversation"
+                    # is_continuation = query['action'] == "continue_conversation"
+                    if isinstance(query, dict) and query.get('action') == "continue_conversation":
+                        is_continuation = True
+                    else:
+                        is_continuation = False
                 except json.JSONDecodeError:
-                    query = query
+                    query = str(query)
                     is_continuation = False
                 
                 if not is_continuation:
@@ -123,7 +127,7 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                     # If the agent;s last message was the confirmation prompt and user says 'yes'
                     last_question = agent_last_question.get(conversation_id)
                     print("LAST QUESTION: ", last_question)
-                    if last_question and "Is this summary correct?" in last_question and query.lower() == "yes":
+                    if last_question and "Is this summary correct?" in last_question and str(query).lower() == "yes":
                         logger.info("Processing the chat and extracting details...")
                         
                         # A. fetch the full conversation history
@@ -162,7 +166,7 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                         del agent_last_question[conversation_id]
                         break # Exit the while loop to close the socket
                 
-                    response = await assistant.run(query)
+                    response = await assistant.run(str(query))
                     
                 else:
                     response = await assistant.run(json.dumps(query['chat_history']))
