@@ -248,7 +248,7 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
 
             pipeline.append({"$match": {"$or": or_conditions}})
             
-    if user_issue.location:
+    if user_issue.modeOfService != "Online" and user_issue.location:
             if user_issue.location:
                 pipeline.append({"$match": {
                     "$or": [
@@ -337,7 +337,6 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
             "user_issue": user_issue
         }
         suitable_geeks = PaginatedGeekResponse(**geek_data)
-        print(suitable_geeks)
     except Exception as e:
         logger.error(f"Error creating AggregatedGeekOutput objects from suitable geeks data: {e}")
         raise
