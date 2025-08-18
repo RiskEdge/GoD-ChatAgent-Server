@@ -193,9 +193,11 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
     subcategories_collection = db.subcategories
     
     try:
-    
         user = db.users.find_one({"_id": ObjectId(user_issue.user_id)})
-        # print(user)
+        print(user)
+        if not user:
+            logger.warning(f"No user found with id {user_issue.user_id}")
+            return {"error": f"No user found with id {user_issue.user_id}"}
     except Exception as e:
         logger.error(f"Error fetching user's address: {e}")
         return {"error": str(e)}
