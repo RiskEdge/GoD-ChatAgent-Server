@@ -197,7 +197,6 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
         print(user)
         if not user:
             logger.warning(f"No user found with id {user_issue.user_id}")
-            return {"error": f"No user found with id {user_issue.user_id}"}
     except Exception as e:
         logger.error(f"Error fetching user's address: {e}")
         return {"error": str(e)}
@@ -210,16 +209,17 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
         # Find skill ID for the category
         category_skill = categories_collection.find_one({"title": category_name})
         if category_skill:
-            skill_ids.append(category_skill["_id"])
+            skill_ids.append(ObjectId(category_skill["_id"]))
 
         # Find skill ID for the subcategory if it exists and is different from category
         if subcategory_name and subcategory_name != category_name:
             subcategory_skill = subcategories_collection.find_one({"title": subcategory_name})
             if subcategory_skill:
-                skill_ids.append(subcategory_skill["_id"])
+                skill_ids.append(ObjectId(subcategory_skill["_id"]))
 
     if skill_ids:
         # Geeks must have either primarySkill or any of secondarySkills matching the issue's skills
+        
         query["$or"] = [
             {"primarySkill": {"$in": skill_ids}},
             {"secondarySkills": {"$in": skill_ids}}
@@ -236,7 +236,7 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
     if query:
         pipeline.append({"$match": query})
         
-    if user.get("address") and user_issue.modeOfService != "Online" and not user_issue.location:  
+    if user and user.get("address") and user_issue.modeOfService != "Online" and not user_issue.location:  
         city = user["address"].get("city")
         state = user["address"].get("state")
 
@@ -287,10 +287,9 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
         }, {
             '$project': {
                 '_id': 1,
-                "fullName": 1, # <--- MUST BE INCLUDED
+                "fullName": 1,
                     "authProvider": 1,
-                    # "email": 1, # <--- MUST BE INCLUDED
-                    "mobile": 1, # <--- MUST BE INCLUDED
+                    "mobile": 1,
                     "isEmailVerified": 1,
                     "isPhoneVerified": 1,
                     "profileImage": 1,
@@ -307,9 +306,8 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
                 'secondarySkillsNames': '$secondarySkillsNames.title',
                 "reviews": 1,
                 "services": 1,
-                    "type": 1, # <--- MUST BE INCLUDED
+                    "type": 1, 
             }
-        # },
         }, {
             '$facet': {
                 'geeks': [

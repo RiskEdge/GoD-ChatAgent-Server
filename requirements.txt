@@ -6,3 +6,4 @@ langchain-community==0.3.24
 langchain-openai==0.3.17
 pymongo==4.13.0
 concurrent-log-handler==0.9.28
+openai==1.79.0

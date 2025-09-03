@@ -1,6 +1,7 @@
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from openai import OpenAI
 
 
 import asyncio
@@ -53,6 +54,7 @@ app.add_middleware(
 )
 
 ws_connection = ConnectionManager()
+client = OpenAI()
 
 agent_last_question = {}
 
@@ -87,6 +89,32 @@ def shutdown_db_client():
 async def index():
     logger.info("Root route hit")
     return JSONResponse(status_code=200, content={"message": "Hello World!"})
+
+
+@app.post("/tts")
+async def tts(request: dict):
+    text = request.get("text")
+    voice = request.get("voice", "verse")
+
+    try:
+        response = client.audio.speech.create(
+            model="gpt-4o-mini-tts",
+            voice=voice,
+            input=text,
+            response_format="wav",
+            instructions='Voice Affect: Calm, composed, and reassuring. Competent and in control, instilling trust.\n\nTone: Sincere, empathetic, with genuine concern for the customer and understanding of the situation.\n\nPacing: Slower during the apology to allow for clarity and processing. Faster when offering solutions to signal action and resolution.\n\nEmotions: Calm reassurance, empathy, and gratitude.\n\nPronunciation: Clear, precise: Ensures clarity, especially with key details.'
+        )
+
+        # response is a streaming response, so we can yield chunks
+        audio_bytes = response.read()  # blocking full read (for simple case)
+
+        return Response(
+            content=audio_bytes,
+            media_type="audio/wav"
+        )
+
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.websocket("/chat/{user_id}")
 async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
