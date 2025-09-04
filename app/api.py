@@ -40,7 +40,7 @@ logger = setup_logger("GoD AI Chatbot: Server", "app.log")
 
 origins = [
     "http://localhost:5173",
-    "http://localhost:3000",
+    "http://localhost:5500",
     "https://god-chatagent-client-production.up.railway.app",
     "https://god-ui.vercel.app",
     "https://chatbot.riskedgesolutions.com"
@@ -156,7 +156,7 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                     # If the agent;s last message was the confirmation prompt and user says 'yes'
                     last_question = agent_last_question.get(conversation_id)
                     print("LAST QUESTION: ", last_question)
-                    if last_question and "Is this summary correct?" in last_question and str(query).lower() == "yes":
+                    if last_question and "Is this summary correct?" in last_question and "yes" in str(query).lower():
                         logger.info("Processing the chat and extracting details...")
                         
                         # A. fetch the full conversation history
