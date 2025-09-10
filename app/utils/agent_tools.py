@@ -3,6 +3,7 @@ from typing import List
 from typing import Optional
 from pydantic import BaseModel
 import math
+from functools import lru_cache
 import re
 
 from bson import ObjectId
@@ -27,6 +28,7 @@ class PaginatedGeekResponse(BaseModel):
     pages: int
     user_issue: UserIssueInDB
 
+@lru_cache(maxsize=100)
 def get_categories(db: Database) -> List[str]:
     """
     Fetches a list of category names from the database.
@@ -54,6 +56,7 @@ def get_categories(db: Database) -> List[str]:
         raise
 
 # --- Function to fetch subcategories ---
+@lru_cache(maxsize=100)
 def get_subcategories_by_category_slug(db: Database, category_slug: str) -> List[str]:
     """
     Fetches a list of subcategory names associated with a given category slug from the database.
@@ -106,6 +109,7 @@ def get_subcategories_by_category_slug(db: Database, category_slug: str) -> List
         logger.error(f"An unexpected error occurred: {e}")
         raise
 
+@lru_cache(maxsize=100)
 def get_brands_by_category_slug(db: Database, category_slug: str) -> List[str]:
     """
     Fetches a list of brand names associated with a given category slug from the database.

@@ -57,8 +57,6 @@ app.add_middleware(
 ws_connection = ConnectionManager()
 client = OpenAI()
 
-agent_last_question = {}
-
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
@@ -119,13 +117,12 @@ async def tts(request: dict):
 
 @app.websocket("/chat/{user_id}")
 async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
-    logger.info("Chat with agent initiated.")
-    await ws_connection.connect(websocket)
-    
+    agent_last_question = {}
+    # logger.info("Chat with agent initiated.")
     extractor = IssueExtractor()
-    
     assistant = ChatAssistantChain(db_instance=app.state.database)
     
+    await ws_connection.connect(websocket)
     try:
         while True:
             try:
@@ -134,7 +131,6 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                 
                 try:
                     query = json.loads(query)
-                    # is_continuation = query['action'] == "continue_conversation"
                     if isinstance(query, dict) and query.get('action') == "continue_conversation":
                         is_continuation = True
                     else:
@@ -158,6 +154,7 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                     print("LAST QUESTION: ", last_question)
                     if last_question and "Is this summary correct?" in last_question and "yes" in str(query).lower():
                         logger.info("Processing the chat and extracting details...")
+                        await ws_connection.send_message(json.dumps({'response': "Your issue is being processed and we'll find a suitable geek for you shortly.", 'options': None}), websocket)
                         
                         # A. fetch the full conversation history
                         logger.info('fetching the chat hisotry from database...')
@@ -172,7 +169,6 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                             conversation_id=conversation_id
                         )
                         
-                        await ws_connection.send_message(json.dumps({'response': "Your issue is being processed and we'll find a suitable geek for you shortly.", 'options': None}), websocket)
                         
                         # C. create the user issue from the extracted data
                         logger.info("creating user issue from extracted data...")

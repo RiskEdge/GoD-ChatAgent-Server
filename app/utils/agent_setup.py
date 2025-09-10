@@ -2,7 +2,6 @@ from langchain.memory import ConversationBufferMemory
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema.runnable import RunnableLambda, RunnablePassthrough
 from langchain_core.tools import Tool
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 
@@ -105,10 +104,7 @@ class ChatAssistantChain:
         self.output_parser = parser
         self.callback_handler = callback_handler
         self.llm = ChatOpenAI(
-            model="o4-mini", 
-            # temperature=0,
-            # max_tokens=2000, 
-            # streaming=True,
+            model="o4-mini",
             # callbacks=[self.callback_handler] ,
         )
         self.db_instance = db_instance
@@ -162,6 +158,7 @@ class ChatAssistantChain:
             "current_date": current_date
         }
         self.partial_prompt = self.prompt.partial(**partial_dict)
+        self.agent_executor = self._get_chain()
         logger.info("ChatAssistantChain initialized.")
 
     def get_memory_messages(self, query):
@@ -173,7 +170,7 @@ class ChatAssistantChain:
             logger.error(f"Error loading memory history: {e}")
             return []
     
-    def get_chain(self):
+    def _get_chain(self):
         try:
             # chain = (
             #     RunnablePassthrough.assign(history=RunnableLambda(self.get_memory_messages))|self.partial_prompt|self.llm|parser)
@@ -187,10 +184,9 @@ class ChatAssistantChain:
                 agent=agent,
                 tools=self.tools,
                 memory=self.memory,
-                verbose=True
+                # verbose=True
             )
             chain = partial_chain 
-            # | self.output_parser
             logger.info("AgentExecutor chain initialized.")
             return chain
         except Exception as e:
@@ -199,17 +195,9 @@ class ChatAssistantChain:
         
     async def run(self, user_input):
         try:
-            agent_executor = self.get_chain()
-            logger.info(f"Processing user input: {user_input}")
-            # response = await chain.ainvoke({"input": user_input})
-            response = await agent_executor.ainvoke({"input": user_input})
-            # print("RESPONSE: ", type(response))
-            # logger.info(f"AI response: {response}")
-            
-            # self.memory.save_context({"input": user_input}, {"output": response["response"]})
-            logger.info("Memory updated.")
+            # agent_executor = self.get_chain()
+            response = await self.agent_executor.ainvoke({"input": user_input})
             return {"response": response["output"]}
-            # return response
         except Exception as e:
             logger.error(f"Error during chain execution: {e}")
             return None
