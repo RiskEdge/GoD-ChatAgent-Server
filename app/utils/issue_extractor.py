@@ -31,7 +31,8 @@ class IssueExtractor:
             format_instructions = self.parser.get_format_instructions()
             logger.info(f"Extracting issue details from transcript: {transcript}")
             response = await self.chain.ainvoke({"transcript": transcript, "format_instructions": format_instructions})
-            logger.info(f"Extracted issue details: {response}")
+            logger.info(f"Extracted issue details")
+            # logger.info(f"Extracted issue details: {response}")
             response['user_id'] = user_id
             response['conversation_id'] = conversation_id
             return response

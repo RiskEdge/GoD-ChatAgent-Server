@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Response
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from openai import OpenAI
@@ -115,6 +115,20 @@ async def tts(request: dict):
     except Exception as e:
         return {"error": str(e)}
 
+
+@app.post("/stt")
+async def speech_to_text(file: UploadFile = File(...)):
+    audio_bytes = await file.read()
+    
+    # Whisper auto-detects language
+    transcription = client.audio.transcriptions.create(
+        model="whisper-1",
+        file=("audio.wav", audio_bytes, file.content_type),
+        language='hi'
+    )
+    return {"text": transcription.text}
+
+
 @app.websocket("/chat/{user_id}")
 async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
     agent_last_question = {}
@@ -180,10 +194,12 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                             logger.info(f"Fetching geeks from user issue: {issue}")                   
                             geeks = get_geeks_from_user_issue(app.state.database, issue_in_db, page=1, page_size=5)
                             logger.info(f"Geeks fetched: {len(geeks.geeks)}")
-                            if geeks: 
+                            if geeks and len(geeks.geeks) > 0: 
                                 await ws_connection.send_message(json.dumps({'response': f"Please select a Geek to proceed", 'options': [geeks.model_dump_json()]}), websocket)
+                                logger.info("Geeks sent to user.")
                             else:
-                                await ws_connection.send_message(json.dumps({"response": "No suitable geeks found", "options":None}), websocket)
+                                await ws_connection.send_message(json.dumps({"response": "No suitable geeks found. Please try later.", "options":None}), websocket)
+                                logger.error("No suitable geeks found")
                         except Exception as e:
                             logger.error(f"Error fetching geeks from user issue: {e}")
                         
@@ -198,7 +214,6 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                     
                 await ws_connection.send_message(response['response'], websocket)
                 agent_response_text = response.get("response", "Sorry, something went wrong.")
-                # print("AGENT RESPONSE TEXT: ", agent_response_text)
                 
                 # Store the agent's question for the next loop
                 agent_last_question[conversation_id] = agent_response_text

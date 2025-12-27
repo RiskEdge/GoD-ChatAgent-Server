@@ -198,7 +198,7 @@ def get_geeks_from_user_issue(db: Database, user_issue: UserIssueInDB, page: int
     
     try:
         user = db.users.find_one({"_id": ObjectId(user_issue.user_id)})
-        print(user)
+        logger.info("User: ", user)
         if not user:
             logger.warning(f"No user found with id {user_issue.user_id}")
     except Exception as e:
