@@ -96,6 +96,7 @@ For problem frequency:{{ {{"response"}}: "How often does this issue occur?", {{"
 For confirmation: {{ {{"response"}}: "I have gathered all the necessary information. Is this summary correct?", {{"options"}}: ["Yes", "No - needs correction"]}}
 
 You will be provided with conversation history to understand what information has already been collected.
+ALWAYS respond in the same language the user uses.
 """
 
 class ChatAssistantChain:

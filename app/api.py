@@ -123,8 +123,7 @@ async def speech_to_text(file: UploadFile = File(...)):
     # Whisper auto-detects language
     transcription = client.audio.transcriptions.create(
         model="whisper-1",
-        file=("audio.wav", audio_bytes, file.content_type),
-        language='hi'
+        file=("audio.wav", audio_bytes, file.content_type)
     )
     return {"text": transcription.text}
 
