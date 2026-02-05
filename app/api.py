@@ -41,9 +41,9 @@ logger = setup_logger("GoD AI Chatbot: Server", "app.log")
 origins = [
     "http://localhost:5173",
     "http://localhost:5500",
-    "https://god-chatagent-client-production.up.railway.app",
     "https://god-ui.vercel.app",
-    "https://chatbot.riskedgesolutions.com"
+    "https://chatbot.riskedgesolutions.com",
+    "https://god-web-avangweyfef2ddec.southindia-01.azurewebsites.net"
 ]
 
 app.add_middleware(
