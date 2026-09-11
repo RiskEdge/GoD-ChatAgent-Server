@@ -1,6 +1,6 @@
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Response, UploadFile, File
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from openai import OpenAI
 
 
@@ -90,42 +90,84 @@ async def index():
     return JSONResponse(status_code=200, content={"message": "Hello World!"})
 
 
+TTS_VOICE_INSTRUCTIONS = 'Voice Affect: Calm, composed, and reassuring. Competent and in control, instilling trust.\n\nTone: Sincere, empathetic, with genuine concern for the customer and understanding of the situation.\n\nPacing: Slower during the apology to allow for clarity and processing. Faster when offering solutions to signal action and resolution.\n\nEmotions: Calm reassurance, empathy, and gratitude.\n\nPronunciation: Clear, precise: Ensures clarity, especially with key details.'
+
 @app.post("/tts")
 async def tts(request: dict):
-    text = request.get("text")
+    text = (request.get("text") or "").strip()
     voice = request.get("voice", "verse")
+    if not text:
+        raise HTTPException(status_code=400, detail="Text is required")
 
-    try:
-        response = client.audio.speech.create(
-            model="gpt-4o-mini-tts",
-            voice=voice,
-            input=text,
-            response_format="wav",
-            instructions='Voice Affect: Calm, composed, and reassuring. Competent and in control, instilling trust.\n\nTone: Sincere, empathetic, with genuine concern for the customer and understanding of the situation.\n\nPacing: Slower during the apology to allow for clarity and processing. Faster when offering solutions to signal action and resolution.\n\nEmotions: Calm reassurance, empathy, and gratitude.\n\nPronunciation: Clear, precise: Ensures clarity, especially with key details.'
-        )
+    def audio_chunks():
+        try:
+            # Stream chunks to the client as OpenAI generates them, instead of
+            # buffering the whole clip in memory before sending anything.
+            with client.audio.speech.with_streaming_response.create(
+                model="gpt-4o-mini-tts",
+                voice=voice,
+                input=text,
+                response_format="mp3",
+                instructions=TTS_VOICE_INSTRUCTIONS,
+            ) as response:
+                yield from response.iter_bytes()
+        except Exception as e:
+            logger.error(f"TTS streaming error: {e}")
 
-        # response is a streaming response, so we can yield chunks
-        audio_bytes = response.read()  # blocking full read (for simple case)
-
-        return Response(
-            content=audio_bytes,
-            media_type="audio/wav"
-        )
-
-    except Exception as e:
-        return {"error": str(e)}
+    return StreamingResponse(audio_chunks(), media_type="audio/mpeg")
 
 
 @app.post("/stt")
 async def speech_to_text(file: UploadFile = File(...)):
-    audio_bytes = await file.read()
-    
-    # Whisper auto-detects language
-    transcription = client.audio.transcriptions.create(
-        model="whisper-1",
-        file=("audio.wav", audio_bytes, file.content_type)
-    )
-    return {"text": transcription.text}
+    try:
+        audio_bytes = await file.read()
+        if not audio_bytes:
+            raise HTTPException(status_code=400, detail="Empty audio file")
+
+        # Priming the model with real tokens from each expected language
+        # (rather than forcing a single `language`) makes it far less likely
+        # to drift into an unrelated language on short/ambiguous audio, while
+        # still allowing auto-detection for mixed-language speech.
+        transcription = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=(file.filename or "audio.webm", audio_bytes, file.content_type),
+            prompt="The customer is describing a device problem in English, Hindi (हिंदी में बात कर रहे हैं), or Telugu (తెలుగులో మాట్లాడుతున్నారు), or a mix of these languages.",
+        )
+        return {"text": transcription.text}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"STT error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to transcribe audio")
+
+
+_json_decoder = json.JSONDecoder()
+
+
+def _safe_parse_agent_response(text: str) -> dict:
+    """Best-effort parse of the agent's JSON reply. Falls back to wrapping raw
+    text as the response instead of raising, so a single malformed LLM reply
+    (empty, plain prose, markdown-fenced JSON, or multiple JSON objects
+    concatenated together) can't take down the chat session or leak raw JSON
+    into the chat."""
+    cleaned = (text or "").strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`").strip()
+        if cleaned.lower().startswith("json"):
+            cleaned = cleaned[4:].strip()
+    parsed = None
+    try:
+        # raw_decode reads just the first complete JSON value and ignores
+        # anything after it, instead of erroring on "Extra data" the way
+        # json.loads does when the model emits more than one JSON object.
+        candidate, _ = _json_decoder.raw_decode(cleaned)
+        if isinstance(candidate, dict) and candidate.get("response"):
+            parsed = {"response": candidate["response"], "options": candidate.get("options")}
+    except json.JSONDecodeError:
+        pass
+    if parsed is None:
+        parsed = {"response": cleaned or "Sorry, something went wrong. Could you please repeat that?", "options": None}
+    return parsed
 
 
 @app.websocket("/chat/{user_id}")
@@ -211,24 +253,40 @@ async def chat(websocket: WebSocket, user_id: str, conversation_id: str):
                 else:
                     response = await assistant.run(json.dumps(query['chat_history']))
                     
-                await ws_connection.send_message(response['response'], websocket)
-                agent_response_text = response.get("response", "Sorry, something went wrong.")
-                
+                agent_response_text = (response or {}).get("response") or ""
+                parsed_agent_response = _safe_parse_agent_response(agent_response_text)
+
+                await ws_connection.send_message(json.dumps(parsed_agent_response), websocket)
+
                 # Store the agent's question for the next loop
-                agent_last_question[conversation_id] = agent_response_text
+                agent_last_question[conversation_id] = json.dumps(parsed_agent_response)
 
                 # 4. Save agent message to DB
-                logger.info("Saving agent message to DB...")
-                agent_message = ChatMessageBase(
-                    sender=MessageSender.BOT,
-                    message=json.loads(agent_response_text)["response"]
-                )
-                await append_message_to_convo(user_id, conversation_id, agent_message, app.state.database)
-                logger.info("Agent message saved to DB.")
+                try:
+                    logger.info("Saving agent message to DB...")
+                    agent_message = ChatMessageBase(
+                        sender=MessageSender.BOT,
+                        message=parsed_agent_response["response"]
+                    )
+                    await append_message_to_convo(user_id, conversation_id, agent_message, app.state.database)
+                    logger.info("Agent message saved to DB.")
+                except Exception as e:
+                    logger.error(f"Failed to save agent message to DB: {e}")
             except asyncio.TimeoutError:
                 await ws_connection.send_message(websocket, "Session timed out due to inactivity.")
                 await ws_connection.disconnect(websocket)
                 logger.error(f"WebSocket Session timed out due to inactivity.")
+            except WebSocketDisconnect:
+                raise
+            except Exception as e:
+                logger.error(f"Error processing message, session continues: {e}")
+                try:
+                    await ws_connection.send_message(
+                        json.dumps({"response": "Sorry, something went wrong. Could you please try that again?", "options": None}),
+                        websocket
+                    )
+                except Exception:
+                    pass
     except WebSocketDisconnect:
         if conversation_id in agent_last_question:
             del agent_last_question[conversation_id]
