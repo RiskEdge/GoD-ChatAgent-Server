@@ -92,6 +92,15 @@ async def index():
 
 TTS_VOICE_INSTRUCTIONS = 'Voice Affect: Calm, composed, and reassuring. Competent and in control, instilling trust.\n\nTone: Sincere, empathetic, with genuine concern for the customer and understanding of the situation.\n\nPacing: Slower during the apology to allow for clarity and processing. Faster when offering solutions to signal action and resolution.\n\nEmotions: Calm reassurance, empathy, and gratitude.\n\nPronunciation: Clear, precise: Ensures clarity, especially with key details.'
 
+STT_PROMPT = (
+    "The speaker is a customer in India describing a problem with a device or service to a support assistant. "
+    "They may speak English, Hindi, Telugu, Tamil, Kannada or Marathi, and often mix two or more of these "
+    "languages within a single sentence. Transcribe exactly what is spoken, in the order spoken. Do not translate "
+    "or summarize. Write English words in Latin script and words from Indian languages in their own native script. "
+    "Keep brand names, model names, numbers and technical terms as spoken."
+)
+
+
 @app.post("/tts")
 async def tts(request: dict):
     text = (request.get("text") or "").strip()
@@ -124,14 +133,10 @@ async def speech_to_text(file: UploadFile = File(...)):
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="Empty audio file")
 
-        # Priming the model with real tokens from each expected language
-        # (rather than forcing a single `language`) makes it far less likely
-        # to drift into an unrelated language on short/ambiguous audio, while
-        # still allowing auto-detection for mixed-language speech.
         transcription = client.audio.transcriptions.create(
-            model="whisper-1",
+            model="gpt-4o-transcribe",
             file=(file.filename or "audio.webm", audio_bytes, file.content_type),
-            prompt="The customer is describing a device problem in English, Hindi (हिंदी में बात कर रहे हैं), or Telugu (తెలుగులో మాట్లాడుతున్నారు), or a mix of these languages.",
+            prompt=STT_PROMPT,
         )
         return {"text": transcription.text}
     except HTTPException:
